@@ -1,4 +1,4 @@
-# tls_fingerprint
+# FingerprinTLS
 
 This is a placeholder repository for code being provided as part of my TLS Fingerprinting talk to be given at DerbyCon & SecTor this year.
 

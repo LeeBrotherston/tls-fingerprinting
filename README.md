@@ -1,5 +1,5 @@
 # TLS Fingerprinting
 
-This is a placeholder repository for code being provided as part of my TLS Fingerprinting talk to be given at DerbyCon & SecTor this year.
+I will post more details soon, but this is the code to accompany my [TLS Fingerprinting][1] paper and talk.
 
-Code should appear aroudn the 25th Sept 2015 - stay tuned!
+[1]: https://blog.squarelemon.com/tls-fingerprinting/

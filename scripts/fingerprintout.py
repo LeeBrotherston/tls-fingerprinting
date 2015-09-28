@@ -77,16 +77,16 @@ if (sys.argv[2] == 'cleanse'):
 		print "\", \"ciphersuite\": \""+i["ciphersuite"]+"\", ",
 		print "\"compression_length\": \""+i["compression_length"],
 		print "\",  \"compression\": \""+i["compression"]+"\", ",
-		print "\"extensions\": \""+i["extensions"]+"\", \"e_curves\": \"",
+		print "\"extensions\": \""+i["extensions"]+"\"",
 		if "e_curves" in i:
-			print i["e_curves"],
-		print "\", \"sig_alg\": \"",
+			print ", \"e_curves\": \""+i["e_curves"]+"\"",
 		if "sig_alg" in i:
-			print i["sig_alg"],
-		print "\", \"ec_point_fmt\": \"",
+			print ", \"sig_alg\": \"",
+			print i["sig_alg"]+"\"",
 		if "ec_point_fmt" in i:
-			print i["ec_point_fmt"],
-		print "\", \"server\": \"\" }"
+			print ", \"ec_point_fmt\": \"",
+			print i["ec_point_fmt"]+"\"",
+		print "}"
 
 
 

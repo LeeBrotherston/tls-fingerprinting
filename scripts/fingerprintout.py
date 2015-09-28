@@ -68,29 +68,27 @@ if (sys.argv[2] == 'cleanse'):
 		# Fix some minor annoyances
 		# I hate commas in quotes in a comma delimited file... I like cut... OK?
 		i["desc"] = i["desc"].replace(",", " ")
+		i["compression_length"] = i["compression_length"].replace("^ ", "")
+		i["compression_length"] = i["compression_length"].replace(" $", "")
 
+		# XXX Need to get rid of extra spaces
+		# XXX Cleanup database if field found that is just spaces
 
 		# Reprint, hopefully with nicely equally spaced and comma'd and whatever fields
 		print "{\"id\": "+str(i["id"])+", \"desc\": \""+i["desc"]+"\", \"record_tls_version\": \"",
-		print i["record_tls_version"]+"\", \"tls_version\": \""+i["tls_version"],
-		print "\", \"ciphersuite_length\": \""+i["ciphersuite_length"],
-		print "\", \"ciphersuite\": \""+i["ciphersuite"]+"\", ",
-		print "\"compression_length\": \""+i["compression_length"],
-		print "\",  \"compression\": \""+i["compression"]+"\", ",
+		print i["record_tls_version"]+"\", \"tls_version\": \""+i["tls_version"]+"\", ",
+		print "\"ciphersuite_length\": \""+i["ciphersuite_length"]+"\", ",
+		print "\"ciphersuite\": \""+i["ciphersuite"]+"\", ",
+		print "\"compression_length\": \""+i["compression_length"]+"\", ",
+		print "\"compression\": \""+i["compression"]+"\", ",
 		print "\"extensions\": \""+i["extensions"]+"\"",
 		if "e_curves" in i:
 			print ", \"e_curves\": \""+i["e_curves"]+"\"",
 		if "sig_alg" in i:
-			print ", \"sig_alg\": \"",
-			print i["sig_alg"]+"\"",
+			print ", \"sig_alg\": \""+i["sig_alg"]+"\"",
 		if "ec_point_fmt" in i:
-			print ", \"ec_point_fmt\": \"",
-			print i["ec_point_fmt"]+"\"",
+			print ", \"ec_point_fmt\": \""+i["ec_point_fmt"]+"\"",
 		print "}"
-
-
-
-
 
 
 elif (sys.argv[2] == 'ids') or (sys.argv[2] == 'idsinit'):

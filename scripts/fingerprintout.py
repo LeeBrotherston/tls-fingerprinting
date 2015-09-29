@@ -47,21 +47,21 @@ if (sys.argv[2] == 'cleanse'):
 	# but that's ok because this was for the stuff sort & unique can't handle.
 	for i in jfile:
 		for x in j2file:
-			if i["record_tls_version"] == x["record_tls_version"] and \
-				i["tls_version"] == x["tls_version"] and \
-				i["ciphersuite_length"] == x["ciphersuite_length"] and \
-				i["ciphersuite"] == x["ciphersuite"] and \
-				i["compression_length"] == x["compression_length"] and \
-				i["compression"] == x["compression"] and \
-				i["extensions"] == x["extensions"] and	\
+			if i["record_tls_version"].strip() == x["record_tls_version"].strip() and \
+				i["tls_version"].strip() == x["tls_version"].strip() and \
+				i["ciphersuite_length"].strip() == x["ciphersuite_length"].strip() and \
+				i["ciphersuite"].strip() == x["ciphersuite"].strip() and \
+				i["compression_length"].strip() == x["compression_length"].strip() and \
+				i["compression"].strip() == x["compression"].strip() and \
+				i["extensions"].strip() == x["extensions"].strip() and	\
 				"e_curves" in i \
-				and	i["e_curves"] == x["e_curves"] and \
+				and	i["e_curves"].strip() == x["e_curves"].strip() and \
 				"sig_alg" in i and \
-				i["sig_alg"] == x["sig_alg"] and \
+				i["sig_alg"].strip() == x["sig_alg"].strip() and \
 				"ec_point_fmt" in i and \
-				i["ec_point_fmt"] == x["ec_point_fmt"]:
-					if i["desc"] != x["desc"]:
-						print "# Oh no, 2 signatures match: "+str(i["desc"])+" - "+str(x["desc"])
+				i["ec_point_fmt"].strip() == x["ec_point_fmt"].strip():
+					if i["desc"].strip() != x["desc"].strip():
+						print "# Oh no, 2 signatures match: "+str(i["desc"].strip())+" - "+str(x["desc"].strip())
 					#else:
 						#print "# Oh no, duplicate copies of: "+str(i["desc"])
 
@@ -73,19 +73,22 @@ if (sys.argv[2] == 'cleanse'):
 		# XXX Cleanup database if field found that is just spaces
 
 		# Reprint, hopefully with nicely equally spaced and comma'd and whatever fields
-		print "{\"id\": "+str(i["id"])+", \"desc\": \""+i["desc"]+"\", \"record_tls_version\": \"",
-		print i["record_tls_version"]+"\", \"tls_version\": \""+i["tls_version"]+"\", ",
-		print "\"ciphersuite_length\": \""+i["ciphersuite_length"]+"\", ",
-		print "\"ciphersuite\": \""+i["ciphersuite"]+"\", ",
-		print "\"compression_length\": \""+i["compression_length"]+"\", ",
-		print "\"compression\": \""+i["compression"]+"\", ",
-		print "\"extensions\": \""+i["extensions"]+"\"",
+		print "{\"id\": "+str(i["id"])+", \"desc\": \""+i["desc"].strip()+"\", \"record_tls_version\": \"",
+		print i["record_tls_version"].strip()+"\", \"tls_version\": \""+i["tls_version"].strip()+"\", ",
+		print "\"ciphersuite_length\": \""+i["ciphersuite_length"].strip()+"\", ",
+		print "\"ciphersuite\": \""+i["ciphersuite"].strip()+"\", ",
+		print "\"compression_length\": \""+i["compression_length"].strip()+"\", ",
+		print "\"compression\": \""+i["compression"].strip()+"\", ",
+		print "\"extensions\": \""+i["extensions"].strip()+"\"",
 		if "e_curves" in i:
-			print ", \"e_curves\": \""+i["e_curves"]+"\"",
+			if len(i["e_curves"].strip()) > 0:
+				print ", \"e_curves\": \""+i["e_curves"].strip()+"\"",
 		if "sig_alg" in i:
-			print ", \"sig_alg\": \""+i["sig_alg"]+"\"",
+			if len(i["sig_alg"].strip()) > 0:
+				print ", \"sig_alg\": \""+i["sig_alg"].strip()+"\"",
 		if "ec_point_fmt" in i:
-			print ", \"ec_point_fmt\": \""+i["ec_point_fmt"]+"\"",
+			if len(i["ec_point_fmt"].strip()) > 0:
+				print ", \"ec_point_fmt\": \""+i["ec_point_fmt"].strip()+"\"",
 		print "}"
 
 

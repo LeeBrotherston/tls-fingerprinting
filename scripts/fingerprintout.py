@@ -73,8 +73,8 @@ if (sys.argv[2] == 'cleanse'):
 		# XXX Cleanup database if field found that is just spaces
 
 		# Reprint, hopefully with nicely equally spaced and comma'd and whatever fields
-		print "{\"id\": "+str(i["id"])+", \"desc\": \""+i["desc"].strip()+"\", \"record_tls_version\": \"",
-		print i["record_tls_version"].strip()+"\", \"tls_version\": \""+i["tls_version"].strip()+"\", ",
+		print "{\"id\": "+str(i["id"])+", \"desc\": \""+i["desc"].strip()+"\", ",
+		print "\"record_tls_version\": \""+i["record_tls_version"].strip()+"\", \"tls_version\": \""+i["tls_version"].strip()+"\", ",
 		print "\"ciphersuite_length\": \""+i["ciphersuite_length"].strip()+"\", ",
 		print "\"ciphersuite\": \""+i["ciphersuite"].strip()+"\", ",
 		print "\"compression_length\": \""+i["compression_length"].strip()+"\", ",

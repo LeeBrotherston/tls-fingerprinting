@@ -68,8 +68,6 @@ if (sys.argv[2] == 'cleanse'):
 		# Fix some minor annoyances
 		# I hate commas in quotes in a comma delimited file... I like cut... OK?
 		i["desc"] = i["desc"].replace(",", " ")
-		i["compression_length"] = i["compression_length"].replace("^ ", "")
-		i["compression_length"] = i["compression_length"].replace(" $", "")
 
 		# XXX Need to get rid of extra spaces
 		# XXX Cleanup database if field found that is just spaces

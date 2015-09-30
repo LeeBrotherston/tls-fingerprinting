@@ -3,43 +3,25 @@
 # XXX Recalculate the sizes for int's instead of char arrays
 # XXX Work out how to pre-populate as ints instead of char arrays
 
-
+import argparse
 import json
 import sys
 import re
-from pprint import pprint
-
-# Horribly quick & dirty check
-if len(sys.argv) < 3:
-	print "Not enough args"
-	print "Usage:",sys.argv[0],"<fingerprint file> <output>"
-	print "Possible Outputs:"
-	print "  struct    Output C Structures"
-	print "  ids       Output Suricata/Snort Signatures"
-	print "  idsinit   Output Suricata/Snort Signatures matching only"
-	print "            initial handshake (sessionid 0)"
-	print "  cleanse   Re-output at JSON with some format un-breaking (beta)"
-	print "  xkeyscore OK, it's regex, and not that great, probably best not"
-	print "            to use this!"
-
-	exit()
 
 # Open the JSON file
-#with open(sys.argv[1]) as data_file:
-#	jfile = json.load(data_file)
-jfile = []
-with open(sys.argv[1]) as f:
-    for line in f:
-        jfile.append(json.loads(line))
+def read_file(filename):
+	jfile = []
+	with open(filename) as f:
+		for line in f:
+			jfile.append(json.loads(line))
+	return jfile
 
-# I don't python, which is clear as I fail to use whatever the switch/case
-# style statements and just go if else nuts instead.... Woo!
-
-if (sys.argv[2] == 'cleanse'):
+def cleanse(filename):
 	# Reoutput the database cleaned a little...  e.g. before uploading somewhere
+	jfile = read_file(filename)
 	objcount = len(jfile)
 	j2file = []
-	with open(sys.argv[1]) as f:
+	with open(filename) as f:
 		for line in f:
 			j2file.append(json.loads(line))
 	# Not the smartest check ever but if the fingerprint is the same, not including
@@ -91,10 +73,10 @@ if (sys.argv[2] == 'cleanse'):
 				print ", \"ec_point_fmt\": \""+i["ec_point_fmt"].strip()+"\"",
 		print "}"
 
-
-elif (sys.argv[2] == 'ids') or (sys.argv[2] == 'idsinit'):
+def ids(filename, initial=False):
 	# Creating Snort signatures from the fingerprint data
 	# Walk through each entry outputting the appropriate snort rule
+	jfile = read_file(filename)
 	sid = 1000000;
 	for i in jfile:
 
@@ -127,7 +109,7 @@ elif (sys.argv[2] == 'ids') or (sys.argv[2] == 'idsinit'):
 		# Checks TLS Version (not record, the real one)
 		print "content: \"|"+i["tls_version"]+"|\"; distance: 3; rawbytes; ",
 		# Depending on which output was selected use a 0 sessionid length and offset (as there is none)
-		if sys.argv[2] == 'idsinit':
+		if initial:
 			print "content: \"|00|\"; offset: 42; rawbytes; ",
 		# Otherwise use byte_jump to jump the offset of the session_id to get to the ciphersuite section
 		else:
@@ -186,12 +168,12 @@ elif (sys.argv[2] == 'ids') or (sys.argv[2] == 'idsinit'):
 		sid += 1
 		print "\n"
 
-
-elif (sys.argv[2] == 'xkeyscore'):
+def xkeyscore(filename):
 	# This is my joke _joke_... ok?  JOKE!  xkeyscore (i.e. regex) exporter
 	# offsets are poop in regex, don't actually use!
 
 	# Oh python with your spaces!!!!
+	jfile = read_file(filename)
 	output = ''
 	for i in jfile:
 
@@ -262,9 +244,7 @@ elif (sys.argv[2] == 'xkeyscore'):
 		output = re.sub(' ', '', output)
 		print output+"\n"
 
-
-
-elif sys.argv[2] == 'struct':
+def struct(filename):
 	# Build struct array for use in peoples C
 	# Not sorted or indexed or anything for speed, just a dump into an array... YOLO!
 
@@ -272,6 +252,7 @@ elif sys.argv[2] == 'struct':
 	desc_len = tls_version_len = ciphersuite_len = compression_len = 0
 	extensions_len = e_curves_len = sig_alg_len = ec_point_fmt_len = server_name_len = 0
 	record_tls_version_len = 0
+	jfile = read_file(filename)
 	objcount = len(jfile)
 
 	for i in jfile:
@@ -385,5 +366,38 @@ elif sys.argv[2] == 'struct':
 
 	print "\t};"
 
-else:
-	print "Wat?  Don't understand: ", sys.argv[2]
+if __name__ == '__main__':
+	parser = argparse.ArgumentParser()
+
+	action_group = parser.add_mutually_exclusive_group(required=True)
+	action_group.add_argument("-c", "--cleanse", action="store_true",
+							  help="Re-output as JSON with some format un-breaking (beta)")
+	action_group.add_argument("-s", "--struct", action="store_true",
+							  help="Output C Structure")
+	action_group.add_argument("-i", "--ids", action="store_true",
+							  help="Output Suricata/Snort Signatures")
+	action_group.add_argument("-I", "--idsinit", action="store_true",
+							  help="Output Suricata/Snort Signatures matching only initial handshake (sessionid 0)")
+	action_group.add_argument("-x", "--xkeyscore", action="store_true",
+							  help="OK, it's regex, and not that great, probably best not to use this!")
+
+	parser.add_argument('filename', nargs='?', help="Specify the fingerprint file to use")
+	parser.add_argument('outfile', nargs='?', type=argparse.FileType('w'), default=sys.stdout,
+						help="You may optionally supply an output file, otherwise output to stdout")
+
+	args = parser.parse_args()
+
+	sys.stdout = args.outfile
+
+	if args.cleanse:
+		cleanse(args.filename)
+	elif args.struct:
+		struct(args.filename)
+	elif args.ids:
+		ids(args.filename)
+	elif args.idsinit:
+		ids(args.filename, initial=True)
+	elif args.xkeyscore:
+		xkeyscore(args.filename)
+	else:
+		parser.print_usage()

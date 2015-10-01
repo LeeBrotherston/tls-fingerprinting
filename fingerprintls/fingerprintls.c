@@ -223,7 +223,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		default:
 			/* Doesn't look like a valid TLS version.... probably not even a TLS packet, if it is, it's a bad one */
 			if(show_drops)
-				printf("Packet Drop: Bad TLS Version\n", size_tcp);
+				printf("Packet Drop: Bad TLS Version\n");
 			return;
 			break;
 	}

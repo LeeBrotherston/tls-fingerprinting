@@ -158,13 +158,13 @@ def ids(filename, initial=False):
 					special_ext = 1
 					ext_len = re.sub(r'0x([0-9A-Fa-f]{1,2})', r'\1', hex((len(i["sig_alg"])+1)/3))
  					ext_len = re.sub(r'^([0-9A-Fa-f])$', r'0\1 ', ext_len)
-					print "content: \"|"+i["sig_alg"]+"|\"; rawbytes; distance: 0; ",
+					print "content: \"|"+ext_len+i["sig_alg"]+"|\"; rawbytes; distance: 0; ",
 				# ec_point_fmt
 				elif x == "00 0B":
 					special_ext = 1
 					ext_len = re.sub(r'0x([0-9A-Fa-f]{1,2})', r'\1', hex((len(i["ec_point_fmt"])+1)/3))
  					ext_len = re.sub(r'^([0-9A-Fa-f])$', r'0\1 ', ext_len)
-					print "content: \"|"+i["ec_point_fmt"]+"|\"; rawbytes; distance: 0; ",
+					print "content: \"|"+ext_len+i["ec_point_fmt"]+"|\"; rawbytes; distance: 0; ",
 
 
 		print "sid:"+str(sid)+"; rev:1;)"
@@ -235,13 +235,13 @@ def xkeyscore(filename):
 					special_ext = 1
 					ext_len = re.sub(r'0x([0-9A-Fa-f]{1,2})', r'\\x\1', hex((len(i["sig_alg"])+1)/3))
  					ext_len = re.sub(r'^\\x([0-9A-Fa-f])$', r'0\1', ext_len)
-					output = output+i["sig_alg"]+".*"
+					output = output+ext_len+i["sig_alg"]+".*"
 				# ec_point_fmt
 				elif x == "\\x00\\x0B":
 					special_ext = 1
 					ext_len = re.sub(r'0x([0-9A-Fa-f]{1,2})', r'\\x\1', hex((len(i["ec_point_fmt"])+1)/3))
  					ext_len = re.sub(r'^\\x([0-9A-Fa-f])$', r'0\1', ext_len)
-					output = output+i["ec_point_fmt"]+".*"
+					output = output+ext_len+i["ec_point_fmt"]+".*"
 
 
 		output += "\""

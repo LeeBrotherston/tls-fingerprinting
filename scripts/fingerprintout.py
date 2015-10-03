@@ -211,12 +211,12 @@ def xkeyscore(filename):
 				x = re.sub(r'0x([0-9A-Fa-f]{2,2})([0-9A-Fa-f]{2,2})*', r'\\x\1\\x\2', x)
 				if first_ext == 0:
 					# First extension requires a "distance: 2;" to jump it past the "extensions length" field
-					output = output+x
+					output += x
 					first_ext += 1
 				else:
 					if special_ext != 0:
 						special_ext = 0;
-					output = output+x
+					output += x
 
 				# Deal with the "special" extensions
 				# XXX Should update this to include frontloading the lengths.... next
@@ -240,7 +240,7 @@ def xkeyscore(filename):
 					output = output+i["ec_point_fmt"]+".*"
 
 
-		output = output+"\""
+		output += "\""
 		output = re.sub(' ', '', output)
 		print output+"\n"
 
@@ -356,7 +356,7 @@ def struct(filename):
 		else:
 			print ",0 , {}",
 
-		fp_count = fp_count + 1
+		fp_count += 1
 
 		if fp_count < objcount:
 			print "},"

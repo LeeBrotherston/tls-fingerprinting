@@ -9,7 +9,7 @@ In summary the tools are:
 
 * **FingerprinTLS**: TLS session detection on the wire or PCAP and subsequent fingerprint detetion / creation.
 
-* **Fingerprintout**: Export to other formats such as Suricata/Snort rules, ANSI C Structs, "clean" output and xkeyscore (ok, it's regex)
+* **Fingerprintout**: Export to other formats such as Suricata/Snort rules, ANSI C Structs, "clean" output and xkeyscore (ok, it's regex).  NOTE:  Because of a lack of flexibility in the suricata/snort rules language, this is currently less accurate than using FingerprinTLS to detect fingerprints and so may require tuning.
 
 * **fingerprints.json**: The fingerprint "database" itself.
 

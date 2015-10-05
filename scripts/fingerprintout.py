@@ -8,6 +8,7 @@ import json
 import sys
 import re
 
+
 # Open the JSON file
 def read_file(filename):
 	jfile = []
@@ -15,6 +16,7 @@ def read_file(filename):
 		for line in f:
 			jfile.append(json.loads(line))
 	return jfile
+
 
 def cleanse(filename):
 	# Reoutput the database cleaned a little...  e.g. before uploading somewhere
@@ -73,11 +75,12 @@ def cleanse(filename):
 				print ", \"ec_point_fmt\": \""+i["ec_point_fmt"].strip()+"\"",
 		print "}"
 
+
 def ids(filename, initial=False):
 	# Creating Snort signatures from the fingerprint data
 	# Walk through each entry outputting the appropriate snort rule
 	jfile = read_file(filename)
-	sid = 1000000;
+	sid = 1000000
 	for i in jfile:
 
 		# Reformat some of the values prior to printing out rules
@@ -124,9 +127,9 @@ def ids(filename, initial=False):
 		### Now we get to looping through the extensions and dealing with a few special cases where we are
 		### looking at extension content, not just presence and order.
 
-		first_ext = 0;
+		first_ext = 0
 		# This feels like a fudge, but YOLO, it's forget finesse friday \o/ XXX
-		special_ext = 0;
+		special_ext = 0
 		if len(i["extensions"]) > 0:
 			for x in i["extensions"].split(" "):
 				# Reformat this extension to something snort-useful
@@ -139,34 +142,35 @@ def ids(filename, initial=False):
 					if special_ext == 0:
 						print "byte_jump: 2,0,relative; ",
 					else:
-						special_ext = 0;
+						special_ext = 0
 					print "content: \"|"+x+"|\"; rawbytes; distance: 0; ",
 
 				# Deal with the "special" extensions
 				# XXX Should update this to include frontloading the lengths.... next
 				# e_curves
 				if x == "00 0A":
-					special_ext = 1;
+					special_ext = 1
 					ext_len = re.sub(r'0x([0-9A-Fa-f]{1,2})', r'\1', hex((len(i["e_curves"])+1)/3))
  					ext_len = re.sub(r'^([0-9A-Fa-f])$', r'0\1 ', ext_len)
 					print "content: \"|"+ext_len+i["e_curves"]+"|\"; rawbytes; distance: 0; ",
 				# sig_alg
 				elif x == "00 0D":
-					special_ext = 1;
+					special_ext = 1
 					ext_len = re.sub(r'0x([0-9A-Fa-f]{1,2})', r'\1', hex((len(i["sig_alg"])+1)/3))
  					ext_len = re.sub(r'^([0-9A-Fa-f])$', r'0\1 ', ext_len)
-					print "content: \"|"+i["sig_alg"]+"|\"; rawbytes; distance: 0; ",
+					print "content: \"|"+ext_len+i["sig_alg"]+"|\"; rawbytes; distance: 0; ",
 				# ec_point_fmt
 				elif x == "00 0B":
-					special_ext = 1;
+					special_ext = 1
 					ext_len = re.sub(r'0x([0-9A-Fa-f]{1,2})', r'\1', hex((len(i["ec_point_fmt"])+1)/3))
  					ext_len = re.sub(r'^([0-9A-Fa-f])$', r'0\1 ', ext_len)
-					print "content: \"|"+i["ec_point_fmt"]+"|\"; rawbytes; distance: 0; ",
+					print "content: \"|"+ext_len+i["ec_point_fmt"]+"|\"; rawbytes; distance: 0; ",
 
 
 		print "sid:"+str(sid)+"; rev:1;)"
 		sid += 1
 		print "\n"
+
 
 def xkeyscore(filename):
 	# This is my joke _joke_... ok?  JOKE!  xkeyscore (i.e. regex) exporter
@@ -202,47 +206,48 @@ def xkeyscore(filename):
 
 		### Now we get to looping through the extensions and dealing with a few special cases where we are
 		### looking at extension content, not just presence and order.
-		first_ext = 0;
+		first_ext = 0
 		# This feels like a fudge, but YOLO, it's forget finesse friday \o/ XXX
-		special_ext = 0;
+		special_ext = 0
 		if len(i["extensions"]) > 0:
 			for x in i["extensions"].split(" "):
 				# Reformat this extension to something regex-useful
 				x = re.sub(r'0x([0-9A-Fa-f]{2,2})([0-9A-Fa-f]{2,2})*', r'\\x\1\\x\2', x)
 				if first_ext == 0:
 					# First extension requires a "distance: 2;" to jump it past the "extensions length" field
-					output = output+x
+					output += x
 					first_ext += 1
 				else:
 					if special_ext != 0:
-						special_ext = 0;
-					output = output+x
+						special_ext = 0
+					output += x
 
 				# Deal with the "special" extensions
 				# XXX Should update this to include frontloading the lengths.... next
 				# e_curves
 				if x == "\\x00\\x0A":
-					special_ext = 1;
+					special_ext = 1
 					ext_len = re.sub(r'0x([0-9A-Fa-f]{1,2})', r'\\x\1', hex((len(i["e_curves"])+1)/3))
  					ext_len = re.sub(r'^\\x([0-9A-Fa-f])$', r'0\1', ext_len)
 					output = output+ext_len+i["e_curves"]+".*"
 				# sig_alg
 				elif x == "\\x00\\x0D":
-					special_ext = 1;
+					special_ext = 1
 					ext_len = re.sub(r'0x([0-9A-Fa-f]{1,2})', r'\\x\1', hex((len(i["sig_alg"])+1)/3))
  					ext_len = re.sub(r'^\\x([0-9A-Fa-f])$', r'0\1', ext_len)
-					output = output+i["sig_alg"]+".*"
+					output = output+ext_len+i["sig_alg"]+".*"
 				# ec_point_fmt
 				elif x == "\\x00\\x0B":
-					special_ext = 1;
+					special_ext = 1
 					ext_len = re.sub(r'0x([0-9A-Fa-f]{1,2})', r'\\x\1', hex((len(i["ec_point_fmt"])+1)/3))
  					ext_len = re.sub(r'^\\x([0-9A-Fa-f])$', r'0\1', ext_len)
-					output = output+i["ec_point_fmt"]+".*"
+					output = output+ext_len+i["ec_point_fmt"]+".*"
 
 
-		output = output+"\""
+		output += "\""
 		output = re.sub(' ', '', output)
 		print output+"\n"
+
 
 def struct(filename):
 	# Build struct array for use in peoples C
@@ -301,7 +306,7 @@ def struct(filename):
 				e_curves_len = len(i["e_curves"]) + 1
 		if "sig_alg" in i:
 			if sig_alg_len < len(i["sig_alg"]):
-				sig_alg_len = len(i["sig_alg"]) +1
+				sig_alg_len = len(i["sig_alg"]) + 1
 		if "ec_point_fmt" in i:
 			if ec_point_fmt_len < len(i["ec_point_fmt"]):
 				ec_point_fmt_len = len(i["ec_point_fmt"]) + 1
@@ -356,7 +361,7 @@ def struct(filename):
 		else:
 			print ",0 , {}",
 
-		fp_count = fp_count + 1
+		fp_count += 1
 
 		if fp_count < objcount:
 			print "},"

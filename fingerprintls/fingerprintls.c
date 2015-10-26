@@ -126,7 +126,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 	extern FILE *json_fd, *struct_fd;
 	extern int newsig_count;
 
-	int size_ip;
+	int size_ip = 0;
 	int size_tcp;
 	int size_payload;
 	int size_vlan_offset=0;

@@ -38,6 +38,8 @@ mistakes, kthnxbai.
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <net/ethernet.h>
+#include <netinet/ip6.h>
 
 /* My own header sherbizzle */
 #include "fingerprintls.h"
@@ -117,7 +119,6 @@ void output() {
  */
 void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_char *packet) {
 
-
 	/* ************************************************************************* */
 	/* Variables, gotta have variables, and structs and pointers....  and things */
 	/* ************************************************************************* */
@@ -128,17 +129,24 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 	int size_ip;
 	int size_tcp;
 	int size_payload;
+	int size_vlan_offset=0;
+
+	int ip_version=0;
+	int af_type;
+	char src_address_buffer[64];
+	char dst_address_buffer[64];
 
 	/* pointers to key places in the packet headers */
-	const struct ethernet_frame *ethernet;	/* The ethernet header [1] */
-	const struct ip_header *ip;             /* The IP header */
+	const struct ether_header *ethernet;	/* The ethernet header [1] */
+	const struct ipv4_header *ipv4;         /* The IPv4 header */
+	const struct ip6_hdr *ipv6;             /* The IPv6 header */
 	const struct tcp_header *tcp;           /* The TCP header */
 	const u_char *payload;                  /* Packet payload */
 
 	/* Different to struct fingerprint in fpdb.h, this is for building new fingerprints */
 	struct tmp_fingerprint {
 		int 	id;
-		char 	desc[64];
+		char 	desc[128];
 		uint16_t record_tls_version;
 		uint16_t tls_version;
 		int 	ciphersuite_length;
@@ -161,31 +169,92 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 	/* Set pointers to the main parts of the packet */
 	/* ******************************************** */
 
-	/* Ethernet Frame */
-	ethernet = (struct ethernet_frame*)(packet);
+	while(ip_version==0){
+		/* Ethernet Frame */
+		/* CAREFUL: This will obliterate the src/dst MAC pointers. */
+		ethernet = (struct ether_header*)(packet+size_vlan_offset);
 
-	/* IP Header */
-	ip = (struct ip_header*)(packet + SIZE_ETHERNET);
-	size_ip = IP_HL(ip)*4;
-	if (size_ip < 20) {
-		/* This is just wrong, not even bothering */
-		if(show_drops)
-			fprintf(stderr, "Packet Drop: Invalid IP header length: %u bytes\n", size_ip);
-		return;
+		/* Determine the ethernet frame type, and handle accordingly */
+		switch(ntohs(ethernet->ether_type)){
+			case ETHERTYPE_VLAN:
+				size_vlan_offset+=4;
+				/* This will loop through to handle nested 802.1Q headers */
+				break;
+			case ETHERTYPE_IP:
+				/* IPv4 */
+				ip_version=4;
+				af_type=AF_INET;
+				break;
+			case ETHERTYPE_IPV6:
+				/* IPv6 */
+				ip_version=6;
+				af_type=AF_INET6;
+				break;
+			default:
+				/* Something's gone wrong... Doesn't appear to be a valid ethernet frame? */
+				if (show_drops)
+					fprintf(stderr, "Malformed Ethernet frame\n");
+				return;
+		}
+	}
+	if (ip_version==4){
+		/* IP Header */
+		ipv4 = (struct ipv4_header*)(packet + SIZE_ETHERNET + size_vlan_offset);
+		size_ip = IP_HL(ipv4)*4;
+
+		if (size_ip < 20) {
+			/* This is just wrong, not even bothering */
+			if(show_drops)
+				fprintf(stderr, "Packet Drop: Invalid IP header length: %u bytes\n", size_ip);
+			return;
+		}
+
+		/* TCP Header */
+		if (ipv4->ip_p != IPPROTO_TCP) {
+			/* Not TCP, not trying.... don't care.  The BPF filter should
+			 * prevent this happening, but if I remove it you can guarantee I'll have
+			 * forgotten an edge case :) */
+			 if (show_drops)
+			 	fprintf(stderr, "Packet Drop: non-TCP made it though the filter... weird\n");
+			return;
+		}
+	}
+	else if(ip_version==6){
+		/* IP Header */
+		ipv6 = (struct ip6_hdr*)(packet + SIZE_ETHERNET + size_vlan_offset);
+		size_ip = 40;
+
+		/* TODO: Parse 'next header(s)' */
+		//printf("IP Version? %i\n",ntohl(ipv6->ip6_vfc)>>28);
+		//printf("Traffic Class? %i\n",(ntohl(ipv6->ip6_vfc)&0x0ff00000)>>24);
+		//printf("Flow Label? %i\n",ntohl(ipv6->ip6_vfc)&0xfffff);
+		//printf("Payload? %i\n",ntohs(ipv6->ip6_plen));
+		//printf("Next Header? %i\n",ipv6->ip6_nxt);
+
+		/* Sanity Check... Should be IPv6 */
+		if ((ntohl(ipv6->ip6_vfc)>>28)!=6){
+			if(show_drops)
+				fprintf(stderr, "Packet Drop: Invalid IPv6 header\n");
+			return;
+		}
+
+		switch(ipv6->ip6_nxt){
+			case 6:		/* TCP */
+				break;
+			case 17:	/* UDP */
+			case 58:	/* ICMPv6 */
+				if(show_drops)
+				 	fprintf(stderr, "Packet Drop: non-TCP made it though the filter... weird\n");
+				return;
+
+			default:
+				printf("Packet Drop: Unhandled IPv6 next header: %i\n",ipv6->ip6_nxt);
+				return;
+		}
 	}
 
-	/* TCP Header */
-	if (ip->ip_p != IPPROTO_TCP) {
-		/* Not TCP, not trying.... don't care.  The BPF filter should
-		 * prevent this happening, but if I remove it you can guarantee I'll have
-		 * forgotten an edge case :) */
-		 if (show_drops)
-		 	fprintf(stderr, "Packet Drop: non-TCP made it though the filter... weird\n");
-		return;
-	} else {
-		/* Yay, it's TCP, let's set the pointer */
-		tcp = (struct tcp_header*)(packet + SIZE_ETHERNET + size_ip);
-	}
+	/* Yay, it's TCP, let's set the pointer */
+	tcp = (struct tcp_header*)(packet + SIZE_ETHERNET + size_vlan_offset + size_ip);
 
 	size_tcp = (tcp->th_off * 4);
 	if (size_tcp < 20) {
@@ -198,11 +267,12 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 	/* Packet Payload */
 
 	/* Set the payload pointer */
-	payload = (u_char *)(packet + SIZE_ETHERNET + size_ip + (tcp->th_off * 4));
+	payload = (u_char *)(packet + SIZE_ETHERNET + size_vlan_offset + size_ip + (tcp->th_off * 4));
+
 	/* ------------------------------------ */
 
 	/* How big is our payload, according to header info ??? */
-	size_payload = (pcap_header->len - SIZE_ETHERNET - size_ip - (tcp->th_off * 4));
+	size_payload = (pcap_header->len - SIZE_ETHERNET - size_vlan_offset - size_ip - (tcp->th_off * 4));
 	/* ---------------------------------------------------- */
 
 
@@ -224,8 +294,12 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 			/* Doesn't look like a valid TLS version.... probably not even a TLS packet, if it is, it's a bad one */
 			if(show_drops)
 				printf("Packet Drop: Bad TLS Version\n");
+				//printf("%X %X %X %X\n",payload[OFFSET_HELLO_VERSION-8],payload[OFFSET_HELLO_VERSION-7],payload[OFFSET_HELLO_VERSION-6],payload[OFFSET_HELLO_VERSION-5]);
+				//printf("%X %X %X %X\n",payload[OFFSET_HELLO_VERSION-4],payload[OFFSET_HELLO_VERSION-3],payload[OFFSET_HELLO_VERSION-2],payload[OFFSET_HELLO_VERSION-1]);
+				//printf("%X %X %X %X\n",payload[OFFSET_HELLO_VERSION],payload[OFFSET_HELLO_VERSION+1],payload[OFFSET_HELLO_VERSION+2],payload[OFFSET_HELLO_VERSION+3]);
+				//printf("%X %X %X %X\n",payload[OFFSET_HELLO_VERSION+4],payload[OFFSET_HELLO_VERSION+5],payload[OFFSET_HELLO_VERSION+6],payload[OFFSET_HELLO_VERSION+7]);
+				//printf("%X %X %X %X\n",payload[OFFSET_HELLO_VERSION+8],payload[OFFSET_HELLO_VERSION+9],payload[OFFSET_HELLO_VERSION+10],payload[OFFSET_HELLO_VERSION+11]);
 			return;
-			break;
 	}
 
 	/* Check the size of the sessionid */
@@ -243,8 +317,16 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 
 	/* ID and Desc (with defaults for unknown fingerprints) */
 	packet_fp.id = 0;
-	sprintf(packet_fp.desc, "Unknown: %s:%hu -> ", inet_ntoa(ip->ip_src), ntohs(tcp->th_sport));
-	sprintf(packet_fp.desc + strlen(packet_fp.desc), "%s:%hu", inet_ntoa(ip->ip_dst), ntohs(tcp->th_dport));
+	if (ip_version==4) {
+		inet_ntop(af_type,(void*)&ipv4->ip_src,src_address_buffer,sizeof(src_address_buffer));
+		inet_ntop(af_type,(void*)&ipv4->ip_dst,dst_address_buffer,sizeof(dst_address_buffer));
+	}
+	else if (ip_version==6) {
+		inet_ntop(af_type,(void*)&ipv6->ip6_src,src_address_buffer,sizeof(src_address_buffer));
+		inet_ntop(af_type,(void*)&ipv6->ip6_dst,dst_address_buffer,sizeof(dst_address_buffer));
+	}
+
+	snprintf(packet_fp.desc,sizeof(packet_fp.desc),"Unknown: %s:%i -> %s:%i", src_address_buffer, ntohs(tcp->th_sport), dst_address_buffer, ntohs(tcp->th_dport));
 
 	/* TLS Version (Record Layer - not proper proper) */
 	packet_fp.record_tls_version = (payload[1]*256) + payload[2];
@@ -409,8 +491,8 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 				/* Whole criteria match.... woo! */
 				matchcount++;
 				printf("Fingerprint Matched: \"%s\" %s connection from %s:%i to ", fpdb[fp_loop].desc, ssl_version(packet_fp.tls_version),
-					inet_ntoa(ip->ip_src), ntohs(tcp->th_sport));
-				printf("%s:%i ", inet_ntoa(ip->ip_dst), ntohs(tcp->th_dport));
+					src_address_buffer, ntohs(tcp->th_sport));
+				printf("%s:%i ", dst_address_buffer, ntohs(tcp->th_dport));
 				printf("Servername: \"");
 				if(packet_fp.server_name != NULL) {
 					for (arse = 7 ; arse <= (packet_fp.server_name[0]*256 + packet_fp.server_name[1]) + 1 ; arse++) {

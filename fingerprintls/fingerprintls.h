@@ -31,7 +31,7 @@ mistakes, kthnxbai.
 #define SIZE_ETHERNET 14
 
 /* Ethernet addresses are 6 bytes */
-#define ETHER_ADDR_LEN	6
+//#define ETHER_ADDR_LEN	6
 
 /* Ethernet header */
 struct sniff_ethernet {
@@ -40,8 +40,8 @@ struct sniff_ethernet {
         u_short ether_type;                     /* IP? ARP? RARP? etc */
 };
 
-/* IP header */
-struct ip_header {
+/* IPv4 header */
+struct ipv4_header {
         u_char  ip_vhl;                 /* version << 4 | header length >> 2 */
         u_char  ip_tos;                 /* type of service */
         u_short ip_len;                 /* total length */

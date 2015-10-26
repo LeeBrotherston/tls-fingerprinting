@@ -1,9 +1,12 @@
+# Commented this out for now, not sure how many use klang
+#CC=g++
+CFLAGS=-Wall -pedantic
 LDFLAGS=-lpcap
 
-# Change these according to your needs:
-CFLAGS=-Wall -pedantic
-
 all: fingerprintls
+
+fingerprintls:
+	$(CC) $(CFLAGS) fingerprintls.c -o fingerprintls $(LDFLAGS)
 
 clean:
 	rm -rf fingerprintls fingerprintls.o

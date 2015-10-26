@@ -2,8 +2,8 @@
 
 These tools are to enable the matching (either on the wire or via pcap),
 creation, and export of TLS Fingerprints to other formats.  For futher
-information on TLS Fingerprinting please see my [TLS Fingerprinting paper][1]
-and [talk resources][2](video link coming soon).
+information on TLS Fingerprinting please see my [TLS Fingerprinting paper][1],
+[talk resources][2], and [DerbyCon Presentation][5] on the topic.
 
 In summary the tools are:
 
@@ -22,3 +22,4 @@ You can find [me on twitter][3] and [the project on twitter][4] also.
 [2]: https://blog.squarelemon.com/blog/2015/09/25/tls-fingerprinting-resources/
 [3]: https://twitter.com/synackpse
 [4]: https://twitter.com/FingerprinTLS
+[5]: https://www.youtube.com/watch?v=XX0FRAy2Mec

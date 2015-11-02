@@ -26,6 +26,7 @@ mistakes, kthnxbai.
 // TODO
 
 // XXX IPv6 (This should be trivial I just haven't had the time... or ipv6 addresses)
+// XXX add some indexing stuff to fingerprint database instead of searching array in order
 
 #include <pcap.h>
 #include <stdio.h>
@@ -106,6 +107,7 @@ void print_usage(char *bin_name) {
 	fprintf(stderr, "    -j <json file>    Output JSON fingerprints\n");
 	fprintf(stderr, "    -s                Output JSON signatures of unknown connections to stdout\n");
 	fprintf(stderr, "    -d                Show reasons for discarded packets (post BPF)\n");
+	fprintf(stderr, "    -u <uid>          Drop privileges to specified UID (not username)  ** BETA, use at your own peril! **\n");
 	fprintf(stderr, "\n");
 	return;
 }
@@ -635,6 +637,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 int main(int argc, char **argv) {
 
 	char *dev = NULL;					/* capture device name */
+	char *unpriv_user = NULL;					/* User for dropping privs */
 	char errbuf[PCAP_ERRBUF_SIZE];				/* error buffer */
 	pcap_t *handle = NULL;						/* packet capture handle */
 
@@ -700,11 +703,25 @@ int main(int argc, char **argv) {
 				/* Show Dropped Packet Info */
 				show_drops = 1;
 				break;
+			case 'u':
+				/* User for dropping privileges to */
+				unpriv_user = argv[++i];
+				break;
 			default :
 				printf("Unknown option '%s'\n", argv[i]);
 				exit(-1);
 				break;
 
+		}
+	}
+
+	/* Interface should already be opened, we can drop privs now */
+	if (unpriv_user != NULL) {
+		if (setgid(getgid()) == -1) {
+  		fprintf(stderr, "WARNING: could not drop group privileges\n");
+		}
+		if (setuid(atoi(unpriv_user)) == -1) {
+		  fprintf(stderr, "WARNING: could not drop privileges to specified UID\n");
 		}
 	}
 

@@ -719,9 +719,13 @@ int main(int argc, char **argv) {
 	if (unpriv_user != NULL) {
 		if (setgid(getgid()) == -1) {
   		fprintf(stderr, "WARNING: could not drop group privileges\n");
+		} else {
+			fprintf(stderr, "Dropped effective group successfully\n")
 		}
 		if (setuid(atoi(unpriv_user)) == -1) {
 		  fprintf(stderr, "WARNING: could not drop privileges to specified UID\n");
+		} else {
+			fprintf(stderr, "Changed UID successfully\n")
 		}
 	}
 

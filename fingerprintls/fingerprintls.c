@@ -720,12 +720,13 @@ int main(int argc, char **argv) {
 		if (setgid(getgid()) == -1) {
   		fprintf(stderr, "WARNING: could not drop group privileges\n");
 		} else {
-			fprintf(stderr, "Dropped effective group successfully\n")
+			fprintf(stderr, "Dropped effective group successfully\n");
 		}
-		if (setuid(atoi(unpriv_user)) == -1) {
+		//if (setuid(atoi(unpriv_user)) == -1) {
+		if (setuid(getuid()) == -1) {
 		  fprintf(stderr, "WARNING: could not drop privileges to specified UID\n");
 		} else {
-			fprintf(stderr, "Changed UID successfully\n")
+			fprintf(stderr, "Changed UID successfully\n");
 		}
 	}
 

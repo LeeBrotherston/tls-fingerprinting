@@ -43,7 +43,7 @@ mistakes, kthnxbai.
 #include <netinet/ip6.h>
 
 /* For TimeStamping from pcap_pkthdr */
-#include <sys/time.h>
+#include <time.h>
 
 /* My own header sherbizzle */
 #include "fingerprintls.h"

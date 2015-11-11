@@ -42,11 +42,15 @@ mistakes, kthnxbai.
 #include <net/ethernet.h>
 #include <netinet/ip6.h>
 
+/* For TimeStamping from pcap_pkthdr */
+#include <sys/time.h>
+
 /* My own header sherbizzle */
 #include "fingerprintls.h"
 
 /* Statically compiled Fingerprint DB (sorryNotSorry) */
 #include "fpdb.h"
+
 
 /* Binary compare *first with *second for length bytes */
 int binary_compare(uint8_t *first, uint8_t *second, int length) {
@@ -138,6 +142,10 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 	char src_address_buffer[64];
 	char dst_address_buffer[64];
 
+	struct timeval packet_time;
+	struct tm print_time;
+	char printable_time[64];
+
 	/* pointers to key places in the packet headers */
 	const struct ether_header *ethernet;	/* The ethernet header [1] */
 	const struct ipv4_header *ipv4;         /* The IPv4 header */
@@ -165,6 +173,14 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		uint8_t	*ec_point_fmt;
 		char 	*server_name;
 	} packet_fp;
+
+	/* ************************************* */
+	/* Anything we need from the pcap_pkthdr */
+	/* ************************************* */
+
+	packet_time = pcap_header->ts;
+	print_time = *localtime(&packet_time.tv_sec);
+	strftime(printable_time, sizeof printable_time, "%Y-%m-%d %H:%M:%S", &print_time);
 
 
 	/* ******************************************** */
@@ -492,7 +508,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 
 				/* Whole criteria match.... woo! */
 				matchcount++;
-				printf("Fingerprint Matched: \"%s\" %s connection from %s:%i to ", fpdb[fp_loop].desc, ssl_version(packet_fp.tls_version),
+				printf("[%s] Fingerprint Matched: \"%s\" %s connection from %s:%i to ", printable_time, fpdb[fp_loop].desc, ssl_version(packet_fp.tls_version),
 					src_address_buffer, ntohs(tcp->th_sport));
 				printf("%s:%i ", dst_address_buffer, ntohs(tcp->th_dport));
 				printf("Servername: \"");

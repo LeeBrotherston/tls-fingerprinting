@@ -23,9 +23,9 @@ whereby it is forbidden to rip into me too harshly for programming
 mistakes, kthnxbai.
 
 */
-// TODO
 
-// XXX IPv6 (This should be trivial I just haven't had the time... or ipv6 addresses)
+// TODO
+// XXX IPv6 (This should be trivial I just haven't had the time... or ipv6 addresses)...  Partly there now (Thanks David!)
 // XXX add some indexing stuff to fingerprint database instead of searching array in order
 
 #include <pcap.h>
@@ -211,7 +211,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 			default:
 				/* Something's gone wrong... Doesn't appear to be a valid ethernet frame? */
 				if (show_drops)
-					fprintf(stderr, "Malformed Ethernet frame\n");
+					fprintf(stderr, "[%s] Malformed Ethernet frame\n", printable_time);
 				return;
 		}
 	}
@@ -223,7 +223,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		if (size_ip < 20) {
 			/* This is just wrong, not even bothering */
 			if(show_drops)
-				fprintf(stderr, "Packet Drop: Invalid IP header length: %u bytes\n", size_ip);
+				fprintf(stderr, "[%s] Packet Drop: Invalid IP header length: %u bytes\n", printable_time, size_ip);
 			return;
 		}
 
@@ -233,7 +233,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 			 * prevent this happening, but if I remove it you can guarantee I'll have
 			 * forgotten an edge case :) */
 			 if (show_drops)
-			 	fprintf(stderr, "Packet Drop: non-TCP made it though the filter... weird\n");
+			 	fprintf(stderr, "[%s] Packet Drop: non-TCP made it though the filter... weird\n", printable_time);
 			return;
 		}
 	}
@@ -252,7 +252,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		/* Sanity Check... Should be IPv6 */
 		if ((ntohl(ipv6->ip6_vfc)>>28)!=6){
 			if(show_drops)
-				fprintf(stderr, "Packet Drop: Invalid IPv6 header\n");
+				fprintf(stderr, "[%s] Packet Drop: Invalid IPv6 header\n", printable_time);
 			return;
 		}
 
@@ -262,11 +262,11 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 			case 17:	/* UDP */
 			case 58:	/* ICMPv6 */
 				if(show_drops)
-				 	fprintf(stderr, "Packet Drop: non-TCP made it though the filter... weird\n");
+				 	fprintf(stderr, "[%s] Packet Drop: non-TCP made it though the filter... weird\n", printable_time);
 				return;
 
 			default:
-				printf("Packet Drop: Unhandled IPv6 next header: %i\n",ipv6->ip6_nxt);
+				printf("[%s] Packet Drop: Unhandled IPv6 next header: %i\n",printable_time, ipv6->ip6_nxt);
 				return;
 		}
 	}
@@ -278,7 +278,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 	if (size_tcp < 20) {
 		/* Not even trying if this is the case.... kthnxbai */
 		if(show_drops)
-			printf("Packet Drop: Invalid TCP header length: %u bytes\n", size_tcp);
+			printf("[%s] Packet Drop: Invalid TCP header length: %u bytes\n", printable_time, size_tcp);
 		return;
 	}
 
@@ -311,7 +311,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		default:
 			/* Doesn't look like a valid TLS version.... probably not even a TLS packet, if it is, it's a bad one */
 			if(show_drops)
-				printf("Packet Drop: Bad TLS Version\n");
+				printf("[%s] Packet Drop: Bad TLS Version\n", printable_time);
 				//printf("%X %X %X %X\n",payload[OFFSET_HELLO_VERSION-8],payload[OFFSET_HELLO_VERSION-7],payload[OFFSET_HELLO_VERSION-6],payload[OFFSET_HELLO_VERSION-5]);
 				//printf("%X %X %X %X\n",payload[OFFSET_HELLO_VERSION-4],payload[OFFSET_HELLO_VERSION-3],payload[OFFSET_HELLO_VERSION-2],payload[OFFSET_HELLO_VERSION-1]);
 				//printf("%X %X %X %X\n",payload[OFFSET_HELLO_VERSION],payload[OFFSET_HELLO_VERSION+1],payload[OFFSET_HELLO_VERSION+2],payload[OFFSET_HELLO_VERSION+3]);
@@ -324,7 +324,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 	const u_char *cipher_data = &payload[OFFSET_SESSION_LENGTH];
 	if (size_payload < OFFSET_SESSION_LENGTH + cipher_data[0] + 3) {
 		if(show_drops)
-			printf("Packet Drop: Session ID looks bad\n");
+			printf("[%s] Packet Drop: Session ID looks bad\n", printable_time);
 		return;
 	}
 

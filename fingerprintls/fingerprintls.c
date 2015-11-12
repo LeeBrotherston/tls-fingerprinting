@@ -26,6 +26,7 @@ mistakes, kthnxbai.
 
 // TODO
 // XXX IPv6 (This should be trivial I just haven't had the time... or ipv6 addresses)...  Partly there now (Thanks David!)
+// XXX Add UDP support (in theory very easy)
 // XXX add some indexing stuff to fingerprint database instead of searching array in order
 
 #include <pcap.h>
@@ -155,23 +156,24 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 
 	/* Different to struct fingerprint in fpdb.h, this is for building new fingerprints */
 	struct tmp_fingerprint {
-		int 	id;
-		char 	desc[128];
-		uint16_t record_tls_version;
-		uint16_t tls_version;
-		int 	ciphersuite_length;
-		uint8_t	*ciphersuite;
-		int 	compression_length;
-		uint8_t	*compression;
-		int 	extensions_length;
-		uint8_t	*extensions;
-		int		e_curves_length;
-		uint8_t	*e_curves;
-		int sig_alg_length;
-		uint8_t	*sig_alg;
-		int ec_point_fmt_length;
-		uint8_t	*ec_point_fmt;
-		char 	*server_name;
+		int 			id;
+		char 			desc[128];
+		uint16_t 	record_tls_version;
+		uint16_t 	tls_version;
+		int 			ciphersuite_length;
+		uint8_t		*ciphersuite;
+		int 			compression_length;
+		uint8_t		*compression;
+		int 			extensions_length;
+		uint8_t		*extensions;
+		int				e_curves_length;
+		uint8_t		*e_curves;
+		int 			sig_alg_length;
+		uint8_t		*sig_alg;
+		int 			ec_point_fmt_length;
+		uint8_t		*ec_point_fmt;
+		char 			*server_name;
+		int				padding_length;
 	} packet_fp;
 
 	/* ************************************* */
@@ -431,8 +433,19 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 				/* Server Name */
 				packet_fp.server_name = (char *)&cipher_data[ext_id+2];
 				break;
+
+			/* Some potential new extenstions to exploit for fingerprint material */
+			/* Need to be tested for consistent values before deploying though    */
 			case 0x0015:
-				/* Padding...  Causes 2 signatures to be needed because it sometimes appears and sometimes not */
+				/* Padding */
+				/* XXX Need to check if padding length is consistent or varies (varies is not useful to us) */
+				break;
+			case 0x0010:
+				/* application_layer_protocol_negotiation */
+
+				break;
+			case 0x000F:
+				/* HeartBeat (as per padding, is this consistent?) */
 
 				break;
 		}

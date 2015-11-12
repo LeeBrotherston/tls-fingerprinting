@@ -205,7 +205,8 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 				ip_version=4;
 				af_type=AF_INET;
 				break;
-			case ETHERTYPE_IPV6:
+			//case ETHERTYPE_IPV6:
+			case 0x86dd:
 				/* IPv6 */
 				ip_version=6;
 				af_type=AF_INET6;
@@ -217,7 +218,9 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 				return;
 		}
 	}
-	if (ip_version==4){
+
+	switch(ip_version) {
+		case 4:
 		/* IP Header */
 		ipv4 = (struct ipv4_header*)(packet + SIZE_ETHERNET + size_vlan_offset);
 		size_ip = IP_HL(ipv4)*4;
@@ -238,8 +241,9 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 			 	fprintf(stderr, "[%s] Packet Drop: non-TCP made it though the filter... weird\n", printable_time);
 			return;
 		}
-	}
-	else if(ip_version==6){
+		break;
+
+		case 6:
 		/* IP Header */
 		ipv6 = (struct ip6_hdr*)(packet + SIZE_ETHERNET + size_vlan_offset);
 		size_ip = 40;
@@ -250,6 +254,18 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		//printf("Flow Label? %i\n",ntohl(ipv6->ip6_vfc)&0xfffff);
 		//printf("Payload? %i\n",ntohs(ipv6->ip6_plen));
 		//printf("Next Header? %i\n",ipv6->ip6_nxt);
+
+		/* Note: Because the PCAP Libraries don't allow a BPF to adequately process TCP headers on IPv6
+			 packets we have had to accept all IPv6 TCP packets and so extra processing here to ensure
+			 that they're CLIENT_HELLO that is actually done in the BPF for v4.... damn you PCAP!! */
+
+		// XXX These lines are duplicated, will de-dupe later this is for testing without breaking :)
+		tcp = (struct tcp_header*)(packet + SIZE_ETHERNET + size_vlan_offset + size_ip);
+		payload = (u_char *)(packet + SIZE_ETHERNET + size_vlan_offset + size_ip + (tcp->th_off * 4));
+		// Emulating: "(tcp[tcp[12]/16*4]=22 and (tcp[tcp[12]/16*4+5]=1) and (tcp[tcp[12]/16*4+9]=3) and (tcp[tcp[12]/16*4+1]=3))"
+		if(!(payload[0] == 22 && payload[5] == 1 && payload[9] == 3 && payload[1] == 3))
+			return; /* Doesn't match our not BPF, BPF.... BAILING OUT!! */
+
 
 		/* Sanity Check... Should be IPv6 */
 		if ((ntohl(ipv6->ip6_vfc)>>28)!=6){
@@ -271,6 +287,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 				printf("[%s] Packet Drop: Unhandled IPv6 next header: %i\n",printable_time, ipv6->ip6_nxt);
 				return;
 		}
+
 	}
 
 	/* Yay, it's TCP, let's set the pointer */

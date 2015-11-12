@@ -118,7 +118,7 @@ char* ssl_version(u_short version) {
 }
 /* This works perfectly well for TLS, but does not catch horrible SSLv2 packets, soooooo.... */
 //char *default_filter = "tcp[tcp[12]/16*4]=22 and (tcp[tcp[12]/16*4+5]=1) and (tcp[tcp[12]/16*4+9]=3) and (tcp[tcp[12]/16*4+1]=3) and (tcp[tcp[12]/16*4+43]=0)";
-char *default_filter = "tcp[tcp[12]/16*4]=22 and (tcp[tcp[12]/16*4+5]=1) and (tcp[tcp[12]/16*4+9]=3) and (tcp[tcp[12]/16*4+1]=3)";
+char *default_filter = "(tcp[tcp[12]/16*4]=22 and (tcp[tcp[12]/16*4+5]=1) and (tcp[tcp[12]/16*4+9]=3) and (tcp[tcp[12]/16*4+1]=3)) or (ip6 and tcp)";
 
 /* This pushes a bunch of pre-processing out to the BPF filter instead of having to deal with it too much in code */
 // Disabled for now becuase it's too noisey... too many false positives

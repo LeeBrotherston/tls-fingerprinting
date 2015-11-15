@@ -25,9 +25,9 @@ mistakes, kthnxbai.
 */
 
 // TODO
-// XXX IPv6 (This should be trivial I just haven't had the time... or ipv6 addresses)...  Partly there now (Thanks David!)
 // XXX Add UDP support (in theory very easy)
 // XXX add some indexing stuff to fingerprint database instead of searching array in order
+// XXX add 6in4 support (should be as simple as UDP and IPv6... in theory)
 
 #include <pcap.h>
 #include <stdio.h>
@@ -99,6 +99,8 @@ int extensions_compare(uint8_t *packet, uint8_t *fingerprint, int length, int co
 int newsig_count;
 int show_drops;
 FILE *json_fd;
+FILE *unknown_fp_fd;
+
 
 /*
  * print help text
@@ -111,6 +113,7 @@ void print_usage(char *bin_name) {
 	fprintf(stderr, "    -p <pcap file>    Read packets from specified pcap file\n");
 	fprintf(stderr, "    -j <json file>    Output JSON fingerprints\n");
 	fprintf(stderr, "    -s                Output JSON signatures of unknown connections to stdout\n");
+	fprintf(stderr, "    -U                Print unknown fingerprints along with known in output\n");
 	fprintf(stderr, "    -d                Show reasons for discarded packets (post BPF)\n");
 	fprintf(stderr, "    -u <uid>          Drop privileges to specified UID (not username)  ** BETA, use at your own peril! **\n");
 	fprintf(stderr, "\n");
@@ -130,7 +133,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 	/* Variables, gotta have variables, and structs and pointers....  and things */
 	/* ************************************************************************* */
 
-	extern FILE *json_fd, *struct_fd;
+	extern FILE *json_fd, *struct_fd, *unknown_fp_fd;
 	extern int newsig_count;
 
 	int size_ip = 0;
@@ -575,6 +578,24 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 
 		newsig_count++;
 
+		/* If selected output in the normal stream */
+		fprintf(unknown_fp_fd, "[%s] Unknown Fingerprint: %s connection from %s:%i to ", printable_time, ssl_version(packet_fp.tls_version),
+			src_address_buffer, ntohs(tcp->th_sport));
+		fprintf(unknown_fp_fd, "%s:%i ", dst_address_buffer, ntohs(tcp->th_dport));
+		fprintf(unknown_fp_fd, "Servername: \"");
+		if(packet_fp.server_name != NULL) {
+			for (arse = 7 ; arse <= (packet_fp.server_name[0]*256 + packet_fp.server_name[1]) + 1 ; arse++) {
+				if (packet_fp.server_name[arse] > 0x20 && packet_fp.server_name[arse] < 0x7b)
+					fprintf(unknown_fp_fd, "%c", packet_fp.server_name[arse]);
+			}
+		} else {
+			fprintf(unknown_fp_fd, "Not Set");
+		}
+		fprintf(unknown_fp_fd, "\"\n");
+		/* End unknown fingerprint output to normal stream */
+
+		// Should just for json_fd being /dev/null and skip .. optimisation...
+		// or make an output function linked list XXX
 		fprintf(json_fd, "{\"id\": %i, \"desc\": \"%s\", ", packet_fp.id, packet_fp.desc);
 		fprintf(json_fd, "\"record_tls_version\": \"0x%.04X\", ", packet_fp.record_tls_version);
 		fprintf(json_fd, "\"tls_version\": \"0x%.04X\", \"ciphersuite_length\": \"0x%.04X\", ",
@@ -691,7 +712,7 @@ int main(int argc, char **argv) {
 	int arg_start = 1, i;
 	struct bpf_program fp;					/* compiled filter program (expression) */
 
-	extern FILE *json_fd, *struct_fd;
+	extern FILE *json_fd, *struct_fd, *unknown_fp_fd;
 	extern int show_drops;
 	show_drops = 0;
 
@@ -752,6 +773,13 @@ int main(int argc, char **argv) {
 			case 'u':
 				/* User for dropping privileges to */
 				unpriv_user = argv[++i];
+				break;
+			case 'U':
+				/* Output unmatched signatures along with matched (for logging connections, etc) */
+				// XXX Will need neatening in future, but just using an FD for now
+				if((unknown_fp_fd = fopen("/dev/stdout", "a")) == NULL) {
+					printf("Cannot open stdout for writing unmatched fingerprints\n");
+				}
 				break;
 			default :
 				printf("Unknown option '%s'\n", argv[i]);

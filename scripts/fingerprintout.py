@@ -7,7 +7,7 @@ import argparse
 import json
 import sys
 import re
-
+import binascii			# Needed for the binary option
 
 # Open the JSON file
 def read_file(filename):
@@ -16,6 +16,14 @@ def read_file(filename):
 		for line in f:
 			jfile.append(json.loads(line))
 	return jfile
+
+# Take Single or multi byte strings or mixed: "0x00 0x0000 0x00"
+# and return entirely single byte version: "0x00 0x00 0x00 0x00" in binary format
+def byte_to_bin(in_string):
+	in_string = in_string.replace(' ', '')
+	in_string = in_string.replace('0x', '')
+	out_string = binascii.a2b_hex(in_string)
+  	return out_string
 
 
 def cleanse(filename):
@@ -371,6 +379,118 @@ def struct(filename):
 
 	print "\t};"
 
+def binary(filename):
+
+	# XXX accounted for 0x00 where 0x0000 is needed, have not looked at 0x0 yet... check this!!
+
+	# Build a binary "database", which is actually a pre-compiled'ish struct linked list for use in peoples code
+	# Much like the "struct" option but allows more room for indexing/searching and growing as there is no need
+	# to parse strings from some flatfile which C is soooooo good at.  Yes yes, this is still file parsing....
+	# but (from a C perspective) it's easier file parsing, and this isn't so hard in python to output either.
+
+	# Documenting the file format here, in lieu of proper documentation
+
+	# Byte 0		: binary format version
+	# Per fingerprint.....
+	# Bytes 0-3		: Fingerprint ID
+	# Bytes 4-7 	: Desc Length
+	# Bytes <above>	: Desc
+	# Bytes2 <next>	: record_tls_version;
+	# Bytes2 <next>	: tls_version;
+	# etc etc etc
+	# uint16_t ciphersuite_length
+	# uint8_t ciphersuite....
+	# uint8_t compression_length
+	# uint8_t compression....
+	# uint16_t extensions_length
+	# uint8_t extensions....
+	# uint16_t e_curves_length
+	# uint8_t e_curves.....
+	# uint16_t sig_alg_length
+	# uint8_t sig_alg.....
+	# uint16_t ec_point_fmt_length
+	# uint8_t ec_point_fmt....
+
+
+	# Write the version before we itterate through the fingerprints
+	outfile = open("test.bin","ab")
+	outfile.write(byte_to_bin("0x00"))
+
+	# Open the JSON file and process each entry (line)
+	jfile = read_file(filename)
+	objcount = len(jfile)
+
+	for i in jfile:
+		print "Processing: "+i["desc"]
+		# Initialise all the lengths to stop things complaining later.  Oh and other random
+		# weirdness.
+		desc_len = tls_version_len = ciphersuite_len = compression_len = 0
+		extensions_len = e_curves_len = sig_alg_len = ec_point_fmt_len = server_name_len = 0
+		record_tls_version_len = 0
+
+		# Start correctly encoding things and writing them to outfile
+		#temp_data = re.sub(r'0x([0-9A-Fa-f]{2})', r'0x00\1', hex(len(i["desc"])))
+		temp_data = len(i["desc"])
+		temp_data = format(temp_data, '#06x')
+		outfile.write(byte_to_bin(temp_data))
+		outfile.write(i["desc"])
+		outfile.write(byte_to_bin(i["record_tls_version"]))
+		outfile.write(byte_to_bin(i["tls_version"]))
+		outfile.write(byte_to_bin(i["ciphersuite_length"]))
+		outfile.write(byte_to_bin(i["ciphersuite"]))
+
+		# Compression Length is stored as decimal for some reason (go team)
+		# But it's only a one byte value... ccccoooonnnnvvveeeerrrrttttt
+		#temp_data = re.sub(r'0x([0-9A-Fa-f]{1})', r'0x0\1', hex(int(i["compression_length"])))
+		temp_data = len(byte_to_bin(i["compression_length"].zfill(2)))
+		temp_data = format(temp_data, '#04x')
+		outfile.write(byte_to_bin(temp_data))
+
+		# OK, carry on as we were...
+		outfile.write(byte_to_bin(i["compression"]))
+
+		# We need to calculate extensions_length, because it's not in the JSON file
+		# so switcharoo, encode extensions first, then length it, then write... *BOOM*
+		temp_data = len(byte_to_bin(i["extensions"]))
+		temp_data = format(temp_data, '#06x')
+		outfile.write(byte_to_bin(temp_data))
+		outfile.write(byte_to_bin(i["extensions"]))
+
+		# And again for the optionals
+		if "e_curves" in i:
+			#temp_data = re.sub(r'0x([0-9A-Fa-f]{2})', r'0x00\1', hex(len(byte_to_bin(i["e_curves"]))))
+			temp_data = len(byte_to_bin(i["e_curves"]))
+			temp_data = format(temp_data, '#06x')
+			outfile.write(byte_to_bin(temp_data))
+			outfile.write(byte_to_bin(i["e_curves"]))
+		else:
+			# Still need to set zero length
+			outfile.write(byte_to_bin("0x0000"))
+
+		if "sig_alg" in i:
+			#temp_data = re.sub(r'0x([0-9A-Fa-f]{2})', r'0x00\1', hex(len(byte_to_bin(i["sig_alg"]))))
+			temp_data = len(byte_to_bin(i["sig_alg"]))
+			temp_data = format(temp_data, '#06x')
+			outfile.write(byte_to_bin(temp_data))
+			outfile.write(byte_to_bin(i["sig_alg"]))
+		else:
+			# Still need to set zero length
+			outfile.write(byte_to_bin("0x0000"))
+
+		if "ec_point_fmt" in i:
+			#temp_data = re.sub(r'0x([0-9A-Fa-f]{2})', r'0x00\1', hex(len(byte_to_bin(i["ec_point_fmt"]))))
+			temp_data = len(byte_to_bin(i["ec_point_fmt"]))
+			temp_data = format(temp_data, '#06x')
+			outfile.write(byte_to_bin(temp_data))
+			outfile.write(byte_to_bin(i["ec_point_fmt"]))
+		else:
+			# Still need to set zero length
+			outfile.write(byte_to_bin("0x0000"))
+
+	# Close the file before the script terminates
+	outfile.close()
+
+
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
 
@@ -379,6 +499,8 @@ if __name__ == '__main__':
 							  help="Re-output as JSON with some format un-breaking (beta)")
 	action_group.add_argument("-s", "--struct", action="store_true",
 							  help="Output C Structure")
+	action_group.add_argument("-b", "--binary", action="store_true",
+							  help="Output binary fingerprint DB")
 	action_group.add_argument("-i", "--ids", action="store_true",
 							  help="Output Suricata/Snort Signatures")
 	action_group.add_argument("-I", "--idsinit", action="store_true",
@@ -398,6 +520,8 @@ if __name__ == '__main__':
 		cleanse(args.filename)
 	elif args.struct:
 		struct(args.filename)
+	elif args.binary:
+		binary(args.filename)
 	elif args.ids:
 		ids(args.filename)
 	elif args.idsinit:

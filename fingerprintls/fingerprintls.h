@@ -116,6 +116,31 @@ char* ssl_version(u_short version) {
 	snprintf(hex, sizeof(hex), "0x%04hx", version);
 	return hex;
 }
+
+/* Linked list/tree struct.  Used to import the binary blob file exported by fingerprintout.py */
+struct fingerprint_new {
+  uint16_t  *fingerprint_id;
+  uint16_t  *desc_length;
+  char      *desc;
+  uint16_t  *record_tls_version;
+  uint16_t  *tls_version;
+  uint16_t  *ciphersuite_length;
+  uint8_t   *ciphersuite;
+  uint8_t   *compression_length;
+  uint8_t   *compression;
+  uint16_t  *extensions_length;
+  uint8_t   *extensions;
+  uint16_t  *curves_length;
+  uint8_t   *curves;
+  uint16_t  *sig_alg_length;
+  uint8_t   *sig_alg;
+  uint16_t  *ec_point_fmt_length;
+  uint8_t   *ec_point_fmt;
+  struct fingerprint_new  *next;
+};
+
+
+
 /* This works perfectly well for TLS, but does not catch horrible SSLv2 packets, soooooo.... */
 //char *default_filter = "tcp[tcp[12]/16*4]=22 and (tcp[tcp[12]/16*4+5]=1) and (tcp[tcp[12]/16*4+9]=3) and (tcp[tcp[12]/16*4+1]=3) and (tcp[tcp[12]/16*4+43]=0)";
 char *default_filter = "(tcp[tcp[12]/16*4]=22 and (tcp[tcp[12]/16*4+5]=1) and (tcp[tcp[12]/16*4+9]=3) and (tcp[tcp[12]/16*4+1]=3)) or (ip6 and tcp)";

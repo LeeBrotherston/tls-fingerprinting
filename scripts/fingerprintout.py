@@ -413,7 +413,7 @@ def binary(filename):
 
 
 	# Write the version before we itterate through the fingerprints
-	outfile = open("test.bin","ab")
+	outfile = open("test.bin","w+")
 	outfile.write(byte_to_bin("0x00"))
 
 	# Open the JSON file and process each entry (line)

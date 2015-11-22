@@ -390,13 +390,13 @@ def binary(filename):
 
 	# Documenting the file format here, in lieu of proper documentation
 
-	# Byte 0		: binary format version
+	# Byte 0			: binary format version
 	# Per fingerprint.....
-	# Bytes 0-3		: Fingerprint ID
-	# Bytes 4-7 	: Desc Length
-	# Bytes <above>	: Desc
-	# Bytes2 <next>	: record_tls_version;
-	# Bytes2 <next>	: tls_version;
+	# uint16_t			: Fingerprint ID
+	# uint16_t		 	: Desc Length
+	# Bytes <above>		: Desc
+	# uint16_t <next>	: record_tls_version;
+	# uint16_t <next>	: tls_version;
 	# etc etc etc
 	# uint16_t ciphersuite_length
 	# uint8_t ciphersuite....
@@ -421,6 +421,7 @@ def binary(filename):
 	objcount = len(jfile)
 
 	for i in jfile:
+		# Need to add the ID once this is working XXX
 		print "Processing: "+i["desc"]
 		# Initialise all the lengths to stop things complaining later.  Oh and other random
 		# weirdness.
@@ -429,10 +430,13 @@ def binary(filename):
 		record_tls_version_len = 0
 
 		# Start correctly encoding things and writing them to outfile
-		#temp_data = re.sub(r'0x([0-9A-Fa-f]{2})', r'0x00\1', hex(len(i["desc"])))
+		temp_data = format(i["id"], '#06x')
+		outfile.write(byte_to_bin(temp_data))
+
 		temp_data = len(i["desc"])
 		temp_data = format(temp_data, '#06x')
 		outfile.write(byte_to_bin(temp_data))
+
 		outfile.write(i["desc"])
 		outfile.write(byte_to_bin(i["record_tls_version"]))
 		outfile.write(byte_to_bin(i["tls_version"]))
@@ -441,8 +445,7 @@ def binary(filename):
 
 		# Compression Length is stored as decimal for some reason (go team)
 		# But it's only a one byte value... ccccoooonnnnvvveeeerrrrttttt
-		#temp_data = re.sub(r'0x([0-9A-Fa-f]{1})', r'0x0\1', hex(int(i["compression_length"])))
-		temp_data = len(byte_to_bin(i["compression_length"].zfill(2)))
+		temp_data = len(byte_to_bin(i["compression"].zfill(2)))
 		temp_data = format(temp_data, '#04x')
 		outfile.write(byte_to_bin(temp_data))
 
@@ -458,9 +461,9 @@ def binary(filename):
 
 		# And again for the optionals
 		if "e_curves" in i:
-			#temp_data = re.sub(r'0x([0-9A-Fa-f]{2})', r'0x00\1', hex(len(byte_to_bin(i["e_curves"]))))
 			temp_data = len(byte_to_bin(i["e_curves"]))
 			temp_data = format(temp_data, '#06x')
+			print "ecurves length: "+temp_data
 			outfile.write(byte_to_bin(temp_data))
 			outfile.write(byte_to_bin(i["e_curves"]))
 		else:
@@ -468,9 +471,9 @@ def binary(filename):
 			outfile.write(byte_to_bin("0x0000"))
 
 		if "sig_alg" in i:
-			#temp_data = re.sub(r'0x([0-9A-Fa-f]{2})', r'0x00\1', hex(len(byte_to_bin(i["sig_alg"]))))
 			temp_data = len(byte_to_bin(i["sig_alg"]))
 			temp_data = format(temp_data, '#06x')
+			print "sig_alg length: "+temp_data
 			outfile.write(byte_to_bin(temp_data))
 			outfile.write(byte_to_bin(i["sig_alg"]))
 		else:
@@ -478,7 +481,6 @@ def binary(filename):
 			outfile.write(byte_to_bin("0x0000"))
 
 		if "ec_point_fmt" in i:
-			#temp_data = re.sub(r'0x([0-9A-Fa-f]{2})', r'0x00\1', hex(len(byte_to_bin(i["ec_point_fmt"]))))
 			temp_data = len(byte_to_bin(i["ec_point_fmt"]))
 			temp_data = format(temp_data, '#06x')
 			outfile.write(byte_to_bin(temp_data))

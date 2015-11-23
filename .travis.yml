@@ -1,0 +1,10 @@
+language: c
+compiler:
+	- clang
+	- gcc
+install: make
+
+env:
+	- TEST_DIR=fingerprintls
+
+script: cd $TEST_DIR

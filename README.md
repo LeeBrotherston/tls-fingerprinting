@@ -1,4 +1,4 @@
-# TLS Fingerprinting
+# TLS Fingerprinting [![Build Status](https://travis-ci.org/LeeBrotherston/tls-fingerprinting.svg?branch=master)](https://travis-ci.org/LeeBrotherston/tls-fingerprinting)
 
 These tools are to enable the matching (either on the wire or via pcap),
 creation, and export of TLS Fingerprints to other formats.  For futher

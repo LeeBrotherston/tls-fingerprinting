@@ -3,8 +3,10 @@ compiler:
   - clang
   - gcc
 
-before_install:
-  - sudo apt-get install -qq libpcap-dev
+addons:
+  apt:
+    sources:
+      - libpcap-dev
 
 script: cd $TEST_DIR && make
 

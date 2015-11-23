@@ -10,3 +10,5 @@ script: cd $TEST_DIR && make
 
 env:
   - TEST_DIR=fingerprintls
+
+sudo: false

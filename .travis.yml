@@ -2,9 +2,7 @@ language: c
 compiler:
   - clang
   - gcc
-install: make
+install: cd $TEST_DIR && make
 
 env:
   - TEST_DIR=fingerprintls
-
-script: cd $TEST_DIR

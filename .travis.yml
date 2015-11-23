@@ -2,10 +2,11 @@ language: c
 compiler:
   - clang
   - gcc
+
 before_install:
   - sudo apt-get install -qq libpcap-dev
 
-install: cd $TEST_DIR && make
+script: cd $TEST_DIR && make
 
 env:
   - TEST_DIR=fingerprintls

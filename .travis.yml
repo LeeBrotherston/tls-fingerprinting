@@ -1,7 +1,7 @@
 language: c
 compiler:
-	- clang
-	- gcc
+  - clang
+  - gcc
 install: make
 
 env:

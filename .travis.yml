@@ -2,6 +2,9 @@ language: c
 compiler:
   - clang
   - gcc
+before_install:
+  - sudo apt-get install -qq libpcap-dev
+
 install: cd $TEST_DIR && make
 
 env:

@@ -50,8 +50,11 @@ mistakes, kthnxbai.
 #include "fingerprintls.h"
 
 /* Statically compiled Fingerprint DB (sorryNotSorry) */
-#include "fpdb.h"
+/* #include "fpdb.h" */
 
+/* Going to start breaking this up into neater functions/files.  The first of which */
+/* is the fpdb management stuff */
+//#include "fpdb.c"
 
 /* Binary compare *first with *second for length bytes */
 int binary_compare(uint8_t *first, uint8_t *second, int length) {
@@ -98,9 +101,12 @@ int extensions_compare(uint8_t *packet, uint8_t *fingerprint, int length, int co
 
 int newsig_count;
 int show_drops;
-FILE *json_fd;
-FILE *unknown_fp_fd;
+FILE *json_fd = NULL;
+FILE *unknown_fp_fd = NULL;
+FILE *fpdb_fd = NULL;
+struct fingerprint_new *fp_first;
 
+// XXX Currently a bug if -U is not set
 
 /*
  * print help text
@@ -115,6 +121,7 @@ void print_usage(char *bin_name) {
 	fprintf(stderr, "    -s                Output JSON signatures of unknown connections to stdout\n");
 	fprintf(stderr, "    -U                Print unknown fingerprints along with known in output\n");
 	fprintf(stderr, "    -d                Show reasons for discarded packets (post BPF)\n");
+	fprintf(stderr, "    -f <fpdb>         Load the (binary) FingerPrint Database\n");
 	fprintf(stderr, "    -u <uid>          Drop privileges to specified UID (not username)  ** BETA, use at your own peril! **\n");
 	fprintf(stderr, "\n");
 	return;
@@ -149,6 +156,8 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 	struct timeval packet_time;
 	struct tm print_time;
 	char printable_time[64];
+
+	struct fingerprint_new *fp_current;			/* For navigating the fingerprint database */
 
 	/* pointers to key places in the packet headers */
 	const struct ether_header *ethernet;	/* The ethernet header [1] */
@@ -480,7 +489,8 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 	/* ********************************************* */
 	/* The "compare to the fingerprint database" bit */
 	/* ********************************************* */
-	int fp_loop, arse;
+//	int fp_loop, arse;
+	int arse;
 
 	/* XXX This horrible kludge to get around the 2 length fields.  FIX IT! */
 	uint8_t *realcurves = packet_fp.e_curves;
@@ -513,35 +523,38 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 	/* ******************************************************************** */
 
 	int matchcount = 0;
-	/* XXX Should order these to hit easy differentiators first */
-	for(fp_loop = 0; fp_loop < (sizeof(fpdb)/sizeof(fpdb[0])); fp_loop++) {
 
-		if ((packet_fp.record_tls_version == fpdb[fp_loop].record_tls_version) &&
-			(packet_fp.tls_version == fpdb[fp_loop].tls_version) &&
+	/* ************************* */
+	/* New Matching thinger test */
+	/* ************************* */
+	for(fp_current = fp_first ; fp_current != NULL; fp_current = fp_current->next) {
+		//printf("Trying... %.*s\n", fp_current->desc_length, fp_current->desc);
+		if ((packet_fp.record_tls_version == fp_current->record_tls_version) &&
+			(packet_fp.tls_version == fp_current->tls_version) &&
 
-/* XXX extensions_length is misleading!  Length is variable, it is a count of
-   uint8_t's that makes the extensions _list_.  Furthermore, these values are
-	 in pairs, so the count is actually half this....  Handle much more carefully
-	 kthnxbai */
+			/* XXX extensions_length is misleading!  Length is variable, it is a count of
+			   uint8_t's that makes the extensions _list_.  Furthermore, these values are
+				 in pairs, so the count is actually half this....  Handle much more carefully
+				 kthnxbai */
 
-				/* Note: check lengths match first, the later comparisons assume these already match */
-				(packet_fp.ciphersuite_length == fpdb[fp_loop].ciphersuite_length) &&
-				(packet_fp.compression_length == fpdb[fp_loop].compression_length) &&
-				((ext_count * 2) == fpdb[fp_loop].extensions_length) &&
-				(packet_fp.e_curves_length == fpdb[fp_loop].e_curves_length) &&
-				(packet_fp.sig_alg_length == fpdb[fp_loop].sig_alg_length) &&
-				(packet_fp.ec_point_fmt_length == fpdb[fp_loop].ec_point_fmt_length) &&
+			/* Note: check lengths match first, the later comparisons assume these already match */
+			(packet_fp.ciphersuite_length == fp_current->ciphersuite_length) &&
+			(packet_fp.compression_length == fp_current->compression_length) &&
+			((ext_count * 2) == fp_current->extensions_length) &&
+			(packet_fp.e_curves_length == fp_current->curves_length) &&
+			(packet_fp.sig_alg_length == fp_current->sig_alg_length) &&
+			(packet_fp.ec_point_fmt_length == fp_current->ec_point_fmt_length) &&
 
-				binary_compare(packet_fp.ciphersuite, fpdb[fp_loop].ciphersuite, fpdb[fp_loop].ciphersuite_length) &&
-				binary_compare(packet_fp.compression, fpdb[fp_loop].compression, fpdb[fp_loop].compression_length) &&
-				extensions_compare(packet_fp.extensions, fpdb[fp_loop].extensions, ext_len, fpdb[fp_loop].extensions_length) &&
-				binary_compare(realcurves, fpdb[fp_loop].e_curves, fpdb[fp_loop].e_curves_length) &&
-				binary_compare(realsig_alg, fpdb[fp_loop].sig_alg, fpdb[fp_loop].sig_alg_length) &&
-				binary_compare(realec_point_fmt, fpdb[fp_loop].ec_point_fmt, fpdb[fp_loop].ec_point_fmt_length)) {
+			binary_compare(packet_fp.ciphersuite, fp_current->ciphersuite, fp_current->ciphersuite_length) &&
+			binary_compare(packet_fp.compression, fp_current->compression, fp_current->compression_length) &&
+			extensions_compare(packet_fp.extensions, fp_current->extensions, ext_len, fp_current->extensions_length) &&
+			binary_compare(realcurves, fp_current->curves, fp_current->curves_length) &&
+			binary_compare(realsig_alg, fp_current->sig_alg, fp_current->sig_alg_length) &&
+			binary_compare(realec_point_fmt, fp_current->ec_point_fmt, fp_current->ec_point_fmt_length)) {
 
 				/* Whole criteria match.... woo! */
 				matchcount++;
-				printf("[%s] Fingerprint Matched: \"%s\" %s connection from %s:%i to ", printable_time, fpdb[fp_loop].desc, ssl_version(packet_fp.tls_version),
+				printf("[%s] Fingerprint Matched: \"%s\" %s connection from %s:%i to ", printable_time, fp_current->desc, ssl_version(fp_current->tls_version),
 					src_address_buffer, ntohs(tcp->th_sport));
 				printf("%s:%i ", dst_address_buffer, ntohs(tcp->th_dport));
 				printf("Servername: \"");
@@ -563,13 +576,12 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 					printf("(Multiple Match)");
 				printf("\n");
 
-			} else {
-				/* The 'if' failed, so we may wish to do something fuzzy here */
-
-			}
+		} else {
+			/* The 'if' failed, so we may wish to do something fuzzy here */
+			//printf("nope\n");
+		}
 
 	}
-
 
 	/* ********************************************* */
 
@@ -579,21 +591,22 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		newsig_count++;
 
 		/* If selected output in the normal stream */
-		fprintf(unknown_fp_fd, "[%s] Unknown Fingerprint: %s connection from %s:%i to ", printable_time, ssl_version(packet_fp.tls_version),
-			src_address_buffer, ntohs(tcp->th_sport));
-		fprintf(unknown_fp_fd, "%s:%i ", dst_address_buffer, ntohs(tcp->th_dport));
-		fprintf(unknown_fp_fd, "Servername: \"");
-		if(packet_fp.server_name != NULL) {
-			for (arse = 7 ; arse <= (packet_fp.server_name[0]*256 + packet_fp.server_name[1]) + 1 ; arse++) {
-				if (packet_fp.server_name[arse] > 0x20 && packet_fp.server_name[arse] < 0x7b)
-					fprintf(unknown_fp_fd, "%c", packet_fp.server_name[arse]);
+		if(unknown_fp_fd != NULL) {
+			fprintf(unknown_fp_fd, "[%s] Unknown Fingerprint: %s connection from %s:%i to ", printable_time, ssl_version(packet_fp.tls_version),
+				src_address_buffer, ntohs(tcp->th_sport));
+			fprintf(unknown_fp_fd, "%s:%i ", dst_address_buffer, ntohs(tcp->th_dport));
+			fprintf(unknown_fp_fd, "Servername: \"");
+			if(packet_fp.server_name != NULL) {
+				for (arse = 7 ; arse <= (packet_fp.server_name[0]*256 + packet_fp.server_name[1]) + 1 ; arse++) {
+					if (packet_fp.server_name[arse] > 0x20 && packet_fp.server_name[arse] < 0x7b)
+						fprintf(unknown_fp_fd, "%c", packet_fp.server_name[arse]);
+				}
+			} else {
+				fprintf(unknown_fp_fd, "Not Set");
 			}
-		} else {
-			fprintf(unknown_fp_fd, "Not Set");
+			fprintf(unknown_fp_fd, "\"\n");
+			/* End unknown fingerprint output to normal stream */
 		}
-		fprintf(unknown_fp_fd, "\"\n");
-		/* End unknown fingerprint output to normal stream */
-
 		// Should just for json_fd being /dev/null and skip .. optimisation...
 		// or make an output function linked list XXX
 		fprintf(json_fd, "{\"id\": %i, \"desc\": \"%s\", ", packet_fp.id, packet_fp.desc);
@@ -712,7 +725,11 @@ int main(int argc, char **argv) {
 	int arg_start = 1, i;
 	struct bpf_program fp;					/* compiled filter program (expression) */
 
-	extern FILE *json_fd, *struct_fd, *unknown_fp_fd;
+	extern FILE *json_fd, *struct_fd, *unknown_fp_fd, *fpdb_fd;
+	int filesize;
+	struct fingerprint_new *fpdb_new, *fpdb_ptr;
+	uint8_t *fpdb_raw = NULL;
+	int	fp_count = 0;
 	extern int show_drops;
 	show_drops = 0;
 
@@ -781,6 +798,15 @@ int main(int argc, char **argv) {
 					printf("Cannot open stdout for writing unmatched fingerprints\n");
 				}
 				break;
+			case 'f':
+				/* Read the *new* *sparkly* *probably broken* :) binary Fingerprint Database from file */
+				/* In the future this will be to override the default location as this will be the default format */
+				if((fpdb_fd = fopen(argv[++i], "r")) == NULL) {
+					printf("Cannot open fingerprint database file\n");
+					exit(-1);
+				}
+
+				break;
 			default :
 				printf("Unknown option '%s'\n", argv[i]);
 				exit(-1);
@@ -789,7 +815,23 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	/* Interface should already be opened, we can drop privs now */
+	/* Checks required directly after switches are set */
+
+	/* Fingerprint DB load */
+	/* This needs to be before the priv drop in case the fingerprint db requires root privs to read */
+	if(fpdb_fd == NULL) {
+		/* No filename set, trying the current directory */
+		if((fpdb_fd = fopen("tlsfp.db", "r")) == NULL) {
+			printf("Cannot open fingerprint database file (try -f)\n");
+			printf("(This is a new feature, tlsfp.db should be in the source code directory)\n");
+			exit(-1);
+		}
+
+	}
+
+	/* Interface should already be opened, and files read we can drop privs now */
+	/* This should stay the first action as lowering privs reduces risk from any subsequent actions */
+	/* being poorly implimented and running as root */
 	if (unpriv_user != NULL) {
 		if (setgid(getgid()) == -1) {
   		fprintf(stderr, "WARNING: could not drop group privileges\n");
@@ -802,6 +844,122 @@ int main(int argc, char **argv) {
 			fprintf(stderr, "Changed UID successfully\n");
 		}
 	}
+
+	/* XXX Temporary home, but need to test as early in the cycle as possible for now */
+	/* Load binary rules blob and parse */
+
+	/* XXX This if can go when this is "the way" */
+	if(fpdb_fd != NULL) {
+		/* Find the filesize (seek, tell, seekback) */
+		fseek(fpdb_fd, 0L, SEEK_END);
+		filesize = ftell(fpdb_fd);
+		fseek(fpdb_fd, 0L, SEEK_SET);
+
+		/* Allocate memory and store the file in fpdb_raw */
+		fpdb_raw = malloc(filesize);
+		if (fread(fpdb_raw, 1, filesize, fpdb_fd) == filesize) {
+			// printf("Yay, looks like the FPDB file loaded ok\n");
+			fclose(fpdb_fd);
+		} else {
+			printf("There seems to be a problem reading the FPDB file\n");
+			fclose(fpdb_fd);
+			exit(-1);
+		}
+	}
+
+	/* Check and move past the version header (quit if it's wrong) */
+	if (*fpdb_raw == 0) {
+		fpdb_raw++;
+		fpdb_ptr = fpdb_new = fpdb_raw;
+	} else {
+		printf("Unknown version of FPDB file\n");
+		exit(-1);
+	}
+
+	int x;
+	extern struct fingerprint_new *fp_first;
+	struct fingerprint_new *fp_current;
+
+	/* Filesize -1 because of the header, loops through the file, one loop per fingerprint */
+	for (x = 0 ; x < (filesize-1) ; fp_count++) {
+		/* Allocating one my one instead of in a block, may revise this plan later */
+		if(x == 0) {
+			/* Allocate first struct and set the pointer to first */
+			fp_current = fp_first = malloc(sizeof(struct fingerprint_new));
+		} else {
+			/* Allocate a new strcut and set pointer from the previous */
+			fp_current->next = malloc(sizeof(struct fingerprint_new));
+			fp_current = fp_current->next;
+		}
+
+		//  Mini-crib sheet
+		// var - pointer address
+		// *var - value stored at pointer address
+
+		// XXX consider copied (i.e. length) values being free'd to save a little RAM here and there <-- future thing
+
+		fp_current->fingerprint_id = (uint16_t) ((uint16_t)*(fpdb_raw+x) << 8) + ((uint8_t)*(fpdb_raw+x+1));
+		x += 2;
+		fp_current->desc_length =  (uint16_t) ((uint16_t)*(fpdb_raw+x) << 8) + ((uint8_t)*(fpdb_raw+x+1));
+		fp_current->desc = fpdb_raw+x+2;
+
+		x += (uint16_t) ((*(fpdb_raw+x) >> 16) + (*(fpdb_raw+x+1)) + 1); // Skip the description
+
+		fp_current->record_tls_version = (uint16_t) ((uint16_t)*(fpdb_raw+x+1) << 8) + ((uint8_t)*(fpdb_raw+x+2));
+		fp_current->tls_version = (uint16_t) ((uint16_t)*(fpdb_raw+x+3) << 8) + ((uint8_t)*(fpdb_raw+x+4));
+		fp_current->ciphersuite_length = (uint16_t) ((uint16_t)*(fpdb_raw+x+5) << 8) + ((uint8_t)*(fpdb_raw+x+6));
+		fp_current->ciphersuite = fpdb_raw+x+7;
+
+		x += (uint16_t) ((*(fpdb_raw+x+5) >> 16) + (*(fpdb_raw+x+6)))+7; // Skip the ciphersuites
+
+		fp_current->compression_length = *(fpdb_raw+x);
+		fp_current->compression = fpdb_raw+x+1;
+
+		x += (*(fpdb_raw+x))+1; // Skip over compression algo's
+
+		fp_current->extensions_length = (uint16_t) ((uint16_t)*(fpdb_raw+x) << 8) + ((uint8_t)*(fpdb_raw+x+1));
+		fp_current->extensions = fpdb_raw+x+2;
+
+		x += (uint16_t)((*(fpdb_raw+x) >> 16) + *(fpdb_raw+x+1))+2; // Skip extensions list (not extensions - just the list)
+
+		/* Lengths for the extensions which do not exist have already been set to 0 by fingerprintout.py */
+
+		fp_current->curves_length = (uint16_t) ((uint16_t)*(fpdb_raw+x) << 8) + ((uint8_t)*(fpdb_raw+x+1));
+
+		if(fp_current->curves_length == 0) {
+			fp_current->curves = NULL;
+		} else {
+			fp_current->curves = fpdb_raw+x+2;
+		}
+
+		x += (uint16_t)((*(fpdb_raw+x) >> 16) + *(fpdb_raw+x+1))+2;  // Skip past curves
+
+		fp_current->sig_alg_length = (uint16_t) ((uint16_t)*(fpdb_raw+x) << 8) + ((uint8_t)*(fpdb_raw+x+1));
+
+		if(fp_current->sig_alg_length == 0) {
+			fp_current->sig_alg = NULL;
+		} else {
+			fp_current->sig_alg = fpdb_raw+x+2;
+		}
+
+		x += (uint16_t)((*(fpdb_raw+x) >> 16) + *(fpdb_raw+x+1))+2;  // Skip past signature algorithms
+
+		fp_current->ec_point_fmt_length = (uint16_t) ((uint16_t)*(fpdb_raw+x) << 8) + ((uint8_t)*(fpdb_raw+x+1));
+
+		if(fp_current->ec_point_fmt_length == 0) {
+			fp_current->ec_point_fmt = NULL;
+		} else {
+			fp_current->ec_point_fmt = fpdb_raw+x+2;
+		}
+		x += (uint16_t)((*(fpdb_raw+x) >> 16) + *(fpdb_raw+x+1))+2;
+
+	}
+	/* Terminate the linked list */
+	fp_current->next = NULL;
+	printf("Loaded %i signatures\n", fp_count);
+
+	/* XXX END TESTING OF BINARY RULES */
+
 
 	/* XXX HORRIBLE HORRIBLE KLUDGE TO AVOID if's everywhere.  I KNOW OK?! */
 	if(json_fd == NULL) {

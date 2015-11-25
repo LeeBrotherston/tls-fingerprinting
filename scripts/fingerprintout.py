@@ -383,6 +383,8 @@ def binary(filename):
 
 	# XXX accounted for 0x00 where 0x0000 is needed, have not looked at 0x0 yet... check this!!
 
+	# XXX Check the mutt signature with the oddly formed compression len to compression thing
+
 	# Build a binary "database", which is actually a pre-compiled'ish struct linked list for use in peoples code
 	# Much like the "struct" option but allows more room for indexing/searching and growing as there is no need
 	# to parse strings from some flatfile which C is soooooo good at.  Yes yes, this is still file parsing....
@@ -413,7 +415,7 @@ def binary(filename):
 
 
 	# Write the version before we itterate through the fingerprints
-	outfile = open("test.bin","w+")
+	outfile = open("tlsfp.db","w+")
 	outfile.write(byte_to_bin("0x00"))
 
 	# Open the JSON file and process each entry (line)
@@ -463,7 +465,6 @@ def binary(filename):
 		if "e_curves" in i:
 			temp_data = len(byte_to_bin(i["e_curves"]))
 			temp_data = format(temp_data, '#06x')
-			print "ecurves length: "+temp_data
 			outfile.write(byte_to_bin(temp_data))
 			outfile.write(byte_to_bin(i["e_curves"]))
 		else:
@@ -473,7 +474,6 @@ def binary(filename):
 		if "sig_alg" in i:
 			temp_data = len(byte_to_bin(i["sig_alg"]))
 			temp_data = format(temp_data, '#06x')
-			print "sig_alg length: "+temp_data
 			outfile.write(byte_to_bin(temp_data))
 			outfile.write(byte_to_bin(i["sig_alg"]))
 		else:

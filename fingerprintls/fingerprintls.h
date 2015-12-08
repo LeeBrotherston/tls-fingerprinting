@@ -30,6 +30,9 @@ mistakes, kthnxbai.
 /* ethernet headers are always exactly 14 bytes [1] */
 #define SIZE_ETHERNET 14
 
+/* Max hostname length */
+#define HOST_NAME_MAX 255
+
 /* Ethernet addresses are 6 bytes */
 //#define ETHER_ADDR_LEN	6
 

@@ -82,31 +82,6 @@ int binary_compare(uint8_t *first, uint8_t *second, int length) {
 		}
 }
 
-// XXX My crappy implimentation of memcpy for debugging purposes
-int my_memcpy(uint8_t *first, uint8_t *second, int length) {
-		int x;
-		/* Non-existant field needs to be dealt with before counting fun */
-		/* We have already checked that lengths match */
-		if (length == 0) {
-			return 1;
-		}
-
-		printf("my_memcpy debug: ");
-		for(x = 0 ; x < length ; x++) {
-			printf("%X:", *second);
-			*first = *second;
-			first++;
-			second++;
-			printf("%X:%X ", *first, *second);
-		}
-		printf("\n");
-		if (x == length) {
-			return 1;
-		} else {
-			return 0;
-		}
-}
-
 
 /* Compare extensions in packet *packet with fingerprint *fingerprint */
 int extensions_compare(uint8_t *packet, uint8_t *fingerprint, int length, int count) {
@@ -133,6 +108,8 @@ FILE *json_fd = NULL;
 FILE *unknown_fp_fd = NULL;
 FILE *fpdb_fd = NULL;
 struct fingerprint_new *fp_first;
+char hostname[HOST_NAME_MAX];			/* store the hostname once to save multiple lookups */
+
 
 // XXX Currently a bug if -U is not set
 
@@ -170,6 +147,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 
 	extern FILE *json_fd, *struct_fd, *unknown_fp_fd;
 	extern int newsig_count;
+	extern char hostname[HOST_NAME_MAX];
 
 	int size_ip = 0;
 	int size_tcp;
@@ -606,7 +584,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 
 		} else {
 				// Fuzzy Match goes here (if we ever want it)
-			}
+		}
 	}
 
 	/* ********************************************* */
@@ -618,7 +596,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		/* The fingerprint was not matched.  So let's just add it to the internal DB :) */
 		/* Allocate memory to store it */
 		// XXX Cannot do this if we go multi-threaded, locking (urg!) maybe?!!!!!
-		printf("[]%s] New FingerPrint Detected, dynamically adding to in-memory fingerprint database", printable_time);
+		printf("[%s] New FingerPrint [%i] Detected, dynamically adding to in-memory fingerprint database\n", printable_time, newsig_count);
 		// XXX Should really check if malloc works ;)
 		fp_current = malloc(sizeof(struct fingerprint_new));
 		/* Update pointers, put top of list */
@@ -626,9 +604,10 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		fp_first = fp_current;
 		/* Populate the fingerprint */
 		fp_current->fingerprint_id = 0;
-		fp_current->desc = "Unknown (dynamic)";
-		fp_current->desc_length = strlen("Unknown (dynamic)") + 6;
-	  fp_current->record_tls_version = packet_fp.record_tls_version;
+		fp_current->desc_length = strlen("Dynamic ") + strlen(hostname) + 7; // 7 should cover the max uint16_t + space
+		fp_current->desc = malloc(fp_current->desc_length);
+		sprintf(fp_current->desc, "Dynamic %s %d", hostname, newsig_count);
+		fp_current->record_tls_version = packet_fp.record_tls_version;
 	  fp_current->tls_version = packet_fp.tls_version;
 	  fp_current->ciphersuite_length = packet_fp.ciphersuite_length;
 		fp_current->compression_length = packet_fp.compression_length; // Actually *IS* a uint8_t field!!!  ZOMG
@@ -660,8 +639,9 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		}
 
 		/* If selected output in the normal stream */
+		// XXX Remove this once dynamic prints are working properly
 		if(unknown_fp_fd != NULL) {
-			fprintf(unknown_fp_fd, "[%s] Unknown Fingerprint: %s connection from %s:%i to ", printable_time, ssl_version(packet_fp.tls_version),
+			fprintf(unknown_fp_fd, "[%s] New Fingerprint \"%s\": %s connection from %s:%i to ", printable_time, fp_current->desc, ssl_version(packet_fp.tls_version),
 				src_address_buffer, ntohs(tcp->th_sport));
 			fprintf(unknown_fp_fd, "%s:%i ", dst_address_buffer, ntohs(tcp->th_dport));
 			fprintf(unknown_fp_fd, "Servername: \"");
@@ -800,6 +780,7 @@ int main(int argc, char **argv) {
 	uint8_t *fpdb_raw = NULL;
 	int	fp_count = 0;
 	extern int show_drops;
+	extern char hostname[HOST_NAME_MAX];
 	show_drops = 0;
 
 	/* Make sure pipe sees new packets unbuffered. */
@@ -1067,6 +1048,10 @@ int main(int argc, char **argv) {
 
 	/* OK, Checks are done, but we still need to set some stuff up before we go looping */
 
+	/* setup hostname variable for use in logs (incase of multiple hosts) */
+	if(gethostname(hostname, HOST_NAME_MAX) != 0) {
+		sprintf(hostname, "unknown");
+	}
 
 
 	/* now we can set our callback function */

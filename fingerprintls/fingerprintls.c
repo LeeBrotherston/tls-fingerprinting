@@ -69,16 +69,44 @@ int binary_compare(uint8_t *first, uint8_t *second, int length) {
 			if(*first != *second) {
 				break;
 			} else {
+				//printf("%02X:%02X ", *first, *second);
 				first++;
 				second++;
 			}
 		}
+		//printf("\n");
 		if (x == length) {
 			return 1;
 		} else {
 			return 0;
 		}
 }
+
+// XXX My crappy implimentation of memcpy for debugging purposes
+int my_memcpy(uint8_t *first, uint8_t *second, int length) {
+		int x;
+		/* Non-existant field needs to be dealt with before counting fun */
+		/* We have already checked that lengths match */
+		if (length == 0) {
+			return 1;
+		}
+
+		printf("my_memcpy debug: ");
+		for(x = 0 ; x < length ; x++) {
+			printf("%X:", *second);
+			*first = *second;
+			first++;
+			second++;
+			printf("%X:%X ", *first, *second);
+		}
+		printf("\n");
+		if (x == length) {
+			return 1;
+		} else {
+			return 0;
+		}
+}
+
 
 /* Compare extensions in packet *packet with fingerprint *fingerprint */
 int extensions_compare(uint8_t *packet, uint8_t *fingerprint, int length, int count) {
@@ -168,21 +196,21 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 
 	/* Different to struct fingerprint in fpdb.h, this is for building new fingerprints */
 	struct tmp_fingerprint {
-		int 			id;
+		uint16_t 	id;
 		char 			desc[128];
 		uint16_t 	record_tls_version;
 		uint16_t 	tls_version;
-		int 			ciphersuite_length;
+		uint16_t 	ciphersuite_length;
 		uint8_t		*ciphersuite;
-		int 			compression_length;
+		uint8_t		compression_length;
 		uint8_t		*compression;
-		int 			extensions_length;
+		uint16_t 	extensions_length;
 		uint8_t		*extensions;
-		int				e_curves_length;
+		uint16_t	e_curves_length;
 		uint8_t		*e_curves;
-		int 			sig_alg_length;
+		uint16_t 	sig_alg_length;
 		uint8_t		*sig_alg;
-		int 			ec_point_fmt_length;
+		uint16_t 	ec_point_fmt_length;
 		uint8_t		*ec_point_fmt;
 		char 			*server_name;
 		int				padding_length;
@@ -577,18 +605,131 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 				printf("\n");
 
 		} else {
-			/* The 'if' failed, so we may wish to do something fuzzy here */
-			//printf("nope\n");
-		}
+				// Fuzzy Match maybe?
+				/*
+				printf("Match Debug: ");
+				if(packet_fp.ciphersuite_length == fp_current->ciphersuite_length) {
+					printf("Y");
+				} else {
+					printf("N");
+				}
+				if(packet_fp.compression_length == fp_current->compression_length) {
+					printf("Y");
+				} else {
+					printf("N");
+				}
+				if((ext_count * 2) == fp_current->extensions_length) {
+					printf("Y");
+				} else {
+					printf("N");
+				}
+				if(packet_fp.e_curves_length == fp_current->curves_length) {
+					printf("Y");
+				} else {
+					printf("N");
+				}
+				if(packet_fp.sig_alg_length == fp_current->sig_alg_length) {
+					printf("Y");
+				} else {
+					printf("N");
+				}
+				if(packet_fp.ec_point_fmt_length == fp_current->ec_point_fmt_length) {
+					printf("Y");
+				} else {
+					printf("N");
+				}
 
+				if(binary_compare(packet_fp.ciphersuite, fp_current->ciphersuite, fp_current->ciphersuite_length)) {
+					printf("Y");
+				} else {
+					printf("N");
+				}
+				if(binary_compare(packet_fp.compression, fp_current->compression, fp_current->compression_length)) {
+					printf("Y");
+				} else {
+					printf("N");
+				}
+				if(extensions_compare(packet_fp.extensions, fp_current->extensions, ext_len, fp_current->extensions_length)) {
+					printf("Y %02X%02X %02X%02X ", packet_fp.extensions[0], packet_fp.extensions[1], fp_current->extensions[0], fp_current->extensions[1]);
+				} else {
+					printf("N %02X%02X %02X%02X ", packet_fp.extensions[0], packet_fp.extensions[1], fp_current->extensions[0], fp_current->extensions[1]);
+				}
+				if(binary_compare(realcurves, fp_current->curves, fp_current->curves_length)) {
+					printf("Y");
+				} else {
+					printf("N");
+				}
+				if(binary_compare(realsig_alg, fp_current->sig_alg, fp_current->sig_alg_length)) {
+					printf("Y");
+				} else {
+					printf("N");
+				}
+				if(binary_compare(realec_point_fmt, fp_current->ec_point_fmt, fp_current->ec_point_fmt_length)) {
+					printf("Y");
+				} else {
+					printf("N %02X%02X %02X%02X ", realec_point_fmt[0], realec_point_fmt[1], fp_current->ec_point_fmt[0], fp_current->ec_point_fmt[1]);
+				}
+				printf("\n");
+				*/
+			}
 	}
 
 	/* ********************************************* */
 
 
 	if(matchcount == 0) {
-
 		newsig_count++;
+
+		/* The fingerprint was not matched.  So let's just add it to the internal DB :) */
+		/* Allocate memory to store it */
+		// XXX Cannot do this if we go multi-threaded, locking (urg!) maybe?!!!!!
+		printf("BETA: adding new, size: %i\n", sizeof(struct fingerprint_new));
+		// XXX Should really check if malloc works ;)
+		fp_current = malloc(sizeof(struct fingerprint_new));
+		/* Update pointers, put top of list */
+		fp_current->next = fp_first;
+		fp_first = fp_current;
+		/* Populate the fingerprint */
+		fp_current->fingerprint_id = 0;
+		fp_current->desc = "Unknown (dynamic)";
+		fp_current->desc_length = strlen("Unknown (dynamic)") + 6;
+	  fp_current->record_tls_version = packet_fp.record_tls_version;
+	  fp_current->tls_version = packet_fp.tls_version;
+	  fp_current->ciphersuite_length = packet_fp.ciphersuite_length;
+		fp_current->compression_length = packet_fp.compression_length; // Actually *IS* a uint8_t field!!!  ZOMG
+	  fp_current->extensions_length = (ext_count * 2);
+	  fp_current->curves_length = packet_fp.e_curves_length;
+		fp_current->sig_alg_length = packet_fp.sig_alg_length;
+		fp_current->ec_point_fmt_length = packet_fp.ec_point_fmt_length;
+		// XXX This little malloc fest should be rolled into one.
+		fp_current->ciphersuite = malloc(fp_current->ciphersuite_length);
+	  fp_current->compression = malloc(fp_current->compression_length);
+  	fp_current->extensions = malloc(fp_current->extensions_length);
+	  fp_current->curves = malloc(fp_current->curves_length);
+  	fp_current->sig_alg = malloc(fp_current->sig_alg_length);
+	  fp_current->ec_point_fmt = malloc(fp_current->ec_point_fmt_length);
+		// Copy the data over
+		memcpy(fp_current->ciphersuite, packet_fp.ciphersuite, fp_current->ciphersuite_length);
+		memcpy(fp_current->compression, packet_fp.compression, fp_current->compression_length);
+		//memcpy(fp_current->extensions, packet_fp.extensions, fp_current->extensions_length);
+		memcpy(fp_current->curves, realcurves, fp_current->curves_length);
+		memcpy(fp_current->sig_alg, realsig_alg, fp_current->sig_alg_length);
+		memcpy(fp_current->ec_point_fmt, realec_point_fmt, fp_current->ec_point_fmt_length);
+
+		// Load up the extensions
+		int unarse = 0;
+		for (arse = 0 ; arse < ext_len ;) {
+			fp_current->extensions[unarse] = (uint8_t) packet_fp.extensions[arse];
+			fp_current->extensions[unarse+1] = (uint8_t) packet_fp.extensions[arse+1];
+			unarse += 2;
+			arse = arse + 4 + (packet_fp.extensions[(arse+2)]*256) + (packet_fp.extensions[arse+3]);
+		}
+		if(extensions_compare(packet_fp.extensions, fp_current->extensions, ext_len, fp_current->extensions_length)) {
+			printf("Extensions OK\n");
+		} else {
+			printf("Extensions BAD\n");
+		}
+		// XXX Still writing - do not compile yet!!
 
 		/* If selected output in the normal stream */
 		if(unknown_fp_fd != NULL) {

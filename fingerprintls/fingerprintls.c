@@ -638,7 +638,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 
 		/* If selected output in the normal stream */
 
-		frintf("[%s] New Fingerprint \"%s\": %s connection from %s:%i to ", printable_time, fp_current->desc, ssl_version(packet_fp.tls_version),
+		printf("[%s] New Fingerprint \"%s\": %s connection from %s:%i to ", printable_time, fp_current->desc, ssl_version(packet_fp.tls_version),
 			src_address_buffer, ntohs(tcp->th_sport));
 		printf("%s:%i ", dst_address_buffer, ntohs(tcp->th_dport));
 		printf("Servername: \"");

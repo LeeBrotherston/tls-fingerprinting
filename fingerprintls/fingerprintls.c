@@ -605,72 +605,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 				printf("\n");
 
 		} else {
-				// Fuzzy Match maybe?
-				/*
-				printf("Match Debug: ");
-				if(packet_fp.ciphersuite_length == fp_current->ciphersuite_length) {
-					printf("Y");
-				} else {
-					printf("N");
-				}
-				if(packet_fp.compression_length == fp_current->compression_length) {
-					printf("Y");
-				} else {
-					printf("N");
-				}
-				if((ext_count * 2) == fp_current->extensions_length) {
-					printf("Y");
-				} else {
-					printf("N");
-				}
-				if(packet_fp.e_curves_length == fp_current->curves_length) {
-					printf("Y");
-				} else {
-					printf("N");
-				}
-				if(packet_fp.sig_alg_length == fp_current->sig_alg_length) {
-					printf("Y");
-				} else {
-					printf("N");
-				}
-				if(packet_fp.ec_point_fmt_length == fp_current->ec_point_fmt_length) {
-					printf("Y");
-				} else {
-					printf("N");
-				}
-
-				if(binary_compare(packet_fp.ciphersuite, fp_current->ciphersuite, fp_current->ciphersuite_length)) {
-					printf("Y");
-				} else {
-					printf("N");
-				}
-				if(binary_compare(packet_fp.compression, fp_current->compression, fp_current->compression_length)) {
-					printf("Y");
-				} else {
-					printf("N");
-				}
-				if(extensions_compare(packet_fp.extensions, fp_current->extensions, ext_len, fp_current->extensions_length)) {
-					printf("Y %02X%02X %02X%02X ", packet_fp.extensions[0], packet_fp.extensions[1], fp_current->extensions[0], fp_current->extensions[1]);
-				} else {
-					printf("N %02X%02X %02X%02X ", packet_fp.extensions[0], packet_fp.extensions[1], fp_current->extensions[0], fp_current->extensions[1]);
-				}
-				if(binary_compare(realcurves, fp_current->curves, fp_current->curves_length)) {
-					printf("Y");
-				} else {
-					printf("N");
-				}
-				if(binary_compare(realsig_alg, fp_current->sig_alg, fp_current->sig_alg_length)) {
-					printf("Y");
-				} else {
-					printf("N");
-				}
-				if(binary_compare(realec_point_fmt, fp_current->ec_point_fmt, fp_current->ec_point_fmt_length)) {
-					printf("Y");
-				} else {
-					printf("N %02X%02X %02X%02X ", realec_point_fmt[0], realec_point_fmt[1], fp_current->ec_point_fmt[0], fp_current->ec_point_fmt[1]);
-				}
-				printf("\n");
-				*/
+				// Fuzzy Match goes here (if we ever want it)
 			}
 	}
 
@@ -683,7 +618,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		/* The fingerprint was not matched.  So let's just add it to the internal DB :) */
 		/* Allocate memory to store it */
 		// XXX Cannot do this if we go multi-threaded, locking (urg!) maybe?!!!!!
-		printf("BETA: adding new, size: %i\n", sizeof(struct fingerprint_new));
+		printf("[]%s] New FingerPrint Detected, dynamically adding to in-memory fingerprint database", printable_time);
 		// XXX Should really check if malloc works ;)
 		fp_current = malloc(sizeof(struct fingerprint_new));
 		/* Update pointers, put top of list */
@@ -708,10 +643,9 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 	  fp_current->curves = malloc(fp_current->curves_length);
   	fp_current->sig_alg = malloc(fp_current->sig_alg_length);
 	  fp_current->ec_point_fmt = malloc(fp_current->ec_point_fmt_length);
-		// Copy the data over
+		// Copy the data over (except extensions)
 		memcpy(fp_current->ciphersuite, packet_fp.ciphersuite, fp_current->ciphersuite_length);
 		memcpy(fp_current->compression, packet_fp.compression, fp_current->compression_length);
-		//memcpy(fp_current->extensions, packet_fp.extensions, fp_current->extensions_length);
 		memcpy(fp_current->curves, realcurves, fp_current->curves_length);
 		memcpy(fp_current->sig_alg, realsig_alg, fp_current->sig_alg_length);
 		memcpy(fp_current->ec_point_fmt, realec_point_fmt, fp_current->ec_point_fmt_length);
@@ -724,12 +658,6 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 			unarse += 2;
 			arse = arse + 4 + (packet_fp.extensions[(arse+2)]*256) + (packet_fp.extensions[arse+3]);
 		}
-		if(extensions_compare(packet_fp.extensions, fp_current->extensions, ext_len, fp_current->extensions_length)) {
-			printf("Extensions OK\n");
-		} else {
-			printf("Extensions BAD\n");
-		}
-		// XXX Still writing - do not compile yet!!
 
 		/* If selected output in the normal stream */
 		if(unknown_fp_fd != NULL) {

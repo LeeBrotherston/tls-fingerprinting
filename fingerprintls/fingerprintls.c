@@ -920,7 +920,7 @@ int main(int argc, char **argv) {
 	/* Check and move past the version header (quit if it's wrong) */
 	if (*fpdb_raw == 0) {
 		fpdb_raw++;
-		fpdb_ptr = fpdb_new = fpdb_raw;
+		fpdb_ptr = fpdb_new = (struct fingerprint_new *) fpdb_raw;
 	} else {
 		printf("Unknown version of FPDB file\n");
 		exit(-1);
@@ -951,7 +951,7 @@ int main(int argc, char **argv) {
 		fp_current->fingerprint_id = (uint16_t) ((uint16_t)*(fpdb_raw+x) << 8) + ((uint8_t)*(fpdb_raw+x+1));
 		x += 2;
 		fp_current->desc_length =  (uint16_t) ((uint16_t)*(fpdb_raw+x) << 8) + ((uint8_t)*(fpdb_raw+x+1));
-		fp_current->desc = fpdb_raw+x+2;
+		fp_current->desc = (char *)fpdb_raw+x+2;
 
 		x += (uint16_t) ((*(fpdb_raw+x) >> 16) + (*(fpdb_raw+x+1)) + 1); // Skip the description
 

@@ -105,7 +105,6 @@ int extensions_compare(uint8_t *packet, uint8_t *fingerprint, int length, int co
 int newsig_count;
 int show_drops;
 FILE *json_fd = NULL;
-FILE *unknown_fp_fd = NULL;
 FILE *fpdb_fd = NULL;
 struct fingerprint_new *fp_first;
 char hostname[HOST_NAME_MAX];			/* store the hostname once to save multiple lookups */
@@ -124,7 +123,6 @@ void print_usage(char *bin_name) {
 	fprintf(stderr, "    -p <pcap file>    Read packets from specified pcap file\n");
 	fprintf(stderr, "    -j <json file>    Output JSON fingerprints\n");
 	fprintf(stderr, "    -s                Output JSON signatures of unknown connections to stdout\n");
-	fprintf(stderr, "    -U                Print unknown fingerprints along with known in output\n");
 	fprintf(stderr, "    -d                Show reasons for discarded packets (post BPF)\n");
 	fprintf(stderr, "    -f <fpdb>         Load the (binary) FingerPrint Database\n");
 	fprintf(stderr, "    -u <uid>          Drop privileges to specified UID (not username)  ** BETA, use at your own peril! **\n");
@@ -145,7 +143,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 	/* Variables, gotta have variables, and structs and pointers....  and things */
 	/* ************************************************************************* */
 
-	extern FILE *json_fd, *struct_fd, *unknown_fp_fd;
+	extern FILE *json_fd, *struct_fd;
 	extern int newsig_count;
 	extern char hostname[HOST_NAME_MAX];
 
@@ -639,23 +637,21 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		}
 
 		/* If selected output in the normal stream */
-		// XXX Remove this once dynamic prints are working properly
-		if(unknown_fp_fd != NULL) {
-			fprintf(unknown_fp_fd, "[%s] New Fingerprint \"%s\": %s connection from %s:%i to ", printable_time, fp_current->desc, ssl_version(packet_fp.tls_version),
-				src_address_buffer, ntohs(tcp->th_sport));
-			fprintf(unknown_fp_fd, "%s:%i ", dst_address_buffer, ntohs(tcp->th_dport));
-			fprintf(unknown_fp_fd, "Servername: \"");
-			if(packet_fp.server_name != NULL) {
-				for (arse = 7 ; arse <= (packet_fp.server_name[0]*256 + packet_fp.server_name[1]) + 1 ; arse++) {
-					if (packet_fp.server_name[arse] > 0x20 && packet_fp.server_name[arse] < 0x7b)
-						fprintf(unknown_fp_fd, "%c", packet_fp.server_name[arse]);
-				}
-			} else {
-				fprintf(unknown_fp_fd, "Not Set");
+
+		frintf("[%s] New Fingerprint \"%s\": %s connection from %s:%i to ", printable_time, fp_current->desc, ssl_version(packet_fp.tls_version),
+			src_address_buffer, ntohs(tcp->th_sport));
+		printf("%s:%i ", dst_address_buffer, ntohs(tcp->th_dport));
+		printf("Servername: \"");
+		if(packet_fp.server_name != NULL) {
+			for (arse = 7 ; arse <= (packet_fp.server_name[0]*256 + packet_fp.server_name[1]) + 1 ; arse++) {
+				if (packet_fp.server_name[arse] > 0x20 && packet_fp.server_name[arse] < 0x7b)
+					printf("%c", packet_fp.server_name[arse]);
 			}
-			fprintf(unknown_fp_fd, "\"\n");
-			/* End unknown fingerprint output to normal stream */
+		} else {
+			printf("Not Set");
 		}
+		printf("\"\n");
+
 		// Should just for json_fd being /dev/null and skip .. optimisation...
 		// or make an output function linked list XXX
 		fprintf(json_fd, "{\"id\": %i, \"desc\": \"%s\", ", packet_fp.id, packet_fp.desc);
@@ -774,7 +770,7 @@ int main(int argc, char **argv) {
 	int arg_start = 1, i;
 	struct bpf_program fp;					/* compiled filter program (expression) */
 
-	extern FILE *json_fd, *struct_fd, *unknown_fp_fd, *fpdb_fd;
+	extern FILE *json_fd, *struct_fd, *fpdb_fd;
 	int filesize;
 	struct fingerprint_new *fpdb_new, *fpdb_ptr;
 	uint8_t *fpdb_raw = NULL;
@@ -840,13 +836,6 @@ int main(int argc, char **argv) {
 			case 'u':
 				/* User for dropping privileges to */
 				unpriv_user = argv[++i];
-				break;
-			case 'U':
-				/* Output unmatched signatures along with matched (for logging connections, etc) */
-				// XXX Will need neatening in future, but just using an FD for now
-				if((unknown_fp_fd = fopen("/dev/stdout", "a")) == NULL) {
-					printf("Cannot open stdout for writing unmatched fingerprints\n");
-				}
 				break;
 			case 'f':
 				/* Read the *new* *sparkly* *probably broken* :) binary Fingerprint Database from file */

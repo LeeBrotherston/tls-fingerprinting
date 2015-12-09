@@ -56,30 +56,6 @@ mistakes, kthnxbai.
 /* is the fpdb management stuff */
 //#include "fpdb.c"
 
-/* Binary compare *first with *second for length bytes */
-int binary_compare(uint8_t *first, uint8_t *second, int length) {
-		int x;
-		/* Non-existant field needs to be dealt with before counting fun */
-		/* We have already checked that lengths match */
-		if (length == 0) {
-			return 1;
-		}
-
-		for(x = 0 ; x < length ; x++) {
-			if(*first != *second) {
-				break;
-			} else {
-				first++;
-				second++;
-			}
-		}
-		if (x == length) {
-			return 1;
-		} else {
-			return 0;
-		}
-}
-
 /* Compare extensions in packet *packet with fingerprint *fingerprint */
 int extensions_compare(uint8_t *packet, uint8_t *fingerprint, int length, int count) {
 	/* XXX check that all things passed to this _are_ uint8_t and we're not only partially checking stuff that may be longer!!!! */
@@ -102,9 +78,10 @@ int extensions_compare(uint8_t *packet, uint8_t *fingerprint, int length, int co
 int newsig_count;
 int show_drops;
 FILE *json_fd = NULL;
-FILE *unknown_fp_fd = NULL;
 FILE *fpdb_fd = NULL;
 struct fingerprint_new *fp_first;
+char hostname[HOST_NAME_MAX];			/* store the hostname once to save multiple lookups */
+
 
 // XXX Currently a bug if -U is not set
 
@@ -119,7 +96,6 @@ void print_usage(char *bin_name) {
 	fprintf(stderr, "    -p <pcap file>    Read packets from specified pcap file\n");
 	fprintf(stderr, "    -j <json file>    Output JSON fingerprints\n");
 	fprintf(stderr, "    -s                Output JSON signatures of unknown connections to stdout\n");
-	fprintf(stderr, "    -U                Print unknown fingerprints along with known in output\n");
 	fprintf(stderr, "    -d                Show reasons for discarded packets (post BPF)\n");
 	fprintf(stderr, "    -f <fpdb>         Load the (binary) FingerPrint Database\n");
 	fprintf(stderr, "    -u <uid>          Drop privileges to specified UID (not username)  ** BETA, use at your own peril! **\n");
@@ -140,8 +116,9 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 	/* Variables, gotta have variables, and structs and pointers....  and things */
 	/* ************************************************************************* */
 
-	extern FILE *json_fd, *struct_fd, *unknown_fp_fd;
+	extern FILE *json_fd, *struct_fd;
 	extern int newsig_count;
+	extern char hostname[HOST_NAME_MAX];
 
 	int size_ip = 0;
 	int size_tcp;
@@ -168,21 +145,21 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 
 	/* Different to struct fingerprint in fpdb.h, this is for building new fingerprints */
 	struct tmp_fingerprint {
-		int 			id;
-		char 			desc[128];
+		uint16_t 	id;
+		char 			desc[312];
 		uint16_t 	record_tls_version;
 		uint16_t 	tls_version;
-		int 			ciphersuite_length;
+		uint16_t 	ciphersuite_length;
 		uint8_t		*ciphersuite;
-		int 			compression_length;
+		uint8_t		compression_length;
 		uint8_t		*compression;
-		int 			extensions_length;
+		uint16_t 	extensions_length;
 		uint8_t		*extensions;
-		int				e_curves_length;
+		uint16_t	e_curves_length;
 		uint8_t		*e_curves;
-		int 			sig_alg_length;
+		uint16_t 	sig_alg_length;
 		uint8_t		*sig_alg;
-		int 			ec_point_fmt_length;
+		uint16_t 	ec_point_fmt_length;
 		uint8_t		*ec_point_fmt;
 		char 			*server_name;
 		int				padding_length;
@@ -191,6 +168,10 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 	/* ************************************* */
 	/* Anything we need from the pcap_pkthdr */
 	/* ************************************* */
+
+	/* In theory time doesn't need to be first because it's saved in the PCAP
+		 header, however I am keeping it here incase we derive it from somewhere
+		 else in future and we want it early in the process. */
 
 	packet_time = pcap_header->ts;
 	print_time = *localtime(&packet_time.tv_sec);
@@ -375,7 +356,6 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		inet_ntop(af_type,(void*)&ipv6->ip6_dst,dst_address_buffer,sizeof(dst_address_buffer));
 	}
 
-	snprintf(packet_fp.desc,sizeof(packet_fp.desc),"Unknown: %s:%i -> %s:%i", src_address_buffer, ntohs(tcp->th_sport), dst_address_buffer, ntohs(tcp->th_dport));
 
 	/* TLS Version (Record Layer - not proper proper) */
 	packet_fp.record_tls_version = (payload[1]*256) + payload[2];
@@ -545,12 +525,12 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 			(packet_fp.sig_alg_length == fp_current->sig_alg_length) &&
 			(packet_fp.ec_point_fmt_length == fp_current->ec_point_fmt_length) &&
 
-			binary_compare(packet_fp.ciphersuite, fp_current->ciphersuite, fp_current->ciphersuite_length) &&
-			binary_compare(packet_fp.compression, fp_current->compression, fp_current->compression_length) &&
+			!(bcmp(packet_fp.ciphersuite, fp_current->ciphersuite, fp_current->ciphersuite_length)) &&
+			!(bcmp(packet_fp.compression, fp_current->compression, fp_current->compression_length)) &&
 			extensions_compare(packet_fp.extensions, fp_current->extensions, ext_len, fp_current->extensions_length) &&
-			binary_compare(realcurves, fp_current->curves, fp_current->curves_length) &&
-			binary_compare(realsig_alg, fp_current->sig_alg, fp_current->sig_alg_length) &&
-			binary_compare(realec_point_fmt, fp_current->ec_point_fmt, fp_current->ec_point_fmt_length)) {
+			!(bcmp(realcurves, fp_current->curves, fp_current->curves_length)) &&
+			!(bcmp(realsig_alg, fp_current->sig_alg, fp_current->sig_alg_length)) &&
+			!(bcmp(realec_point_fmt, fp_current->ec_point_fmt, fp_current->ec_point_fmt_length))) {
 
 				/* Whole criteria match.... woo! */
 				matchcount++;
@@ -577,38 +557,80 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 				printf("\n");
 
 		} else {
-			/* The 'if' failed, so we may wish to do something fuzzy here */
-			//printf("nope\n");
+				// Fuzzy Match goes here (if we ever want it)
 		}
-
 	}
 
 	/* ********************************************* */
 
 
 	if(matchcount == 0) {
-
 		newsig_count++;
 
-		/* If selected output in the normal stream */
-		if(unknown_fp_fd != NULL) {
-			fprintf(unknown_fp_fd, "[%s] Unknown Fingerprint: %s connection from %s:%i to ", printable_time, ssl_version(packet_fp.tls_version),
-				src_address_buffer, ntohs(tcp->th_sport));
-			fprintf(unknown_fp_fd, "%s:%i ", dst_address_buffer, ntohs(tcp->th_dport));
-			fprintf(unknown_fp_fd, "Servername: \"");
-			if(packet_fp.server_name != NULL) {
-				for (arse = 7 ; arse <= (packet_fp.server_name[0]*256 + packet_fp.server_name[1]) + 1 ; arse++) {
-					if (packet_fp.server_name[arse] > 0x20 && packet_fp.server_name[arse] < 0x7b)
-						fprintf(unknown_fp_fd, "%c", packet_fp.server_name[arse]);
-				}
-			} else {
-				fprintf(unknown_fp_fd, "Not Set");
-			}
-			fprintf(unknown_fp_fd, "\"\n");
-			/* End unknown fingerprint output to normal stream */
+		/* The fingerprint was not matched.  So let's just add it to the internal DB :) */
+		/* Allocate memory to store it */
+		// XXX Cannot do this if we go multi-threaded, locking (urg!) maybe?!!!!!
+		printf("[%s] New FingerPrint [%i] Detected, dynamically adding to in-memory fingerprint database\n", printable_time, newsig_count);
+		// XXX Should really check if malloc works ;)
+		fp_current = malloc(sizeof(struct fingerprint_new));
+		/* Update pointers, put top of list */
+		fp_current->next = fp_first;
+		fp_first = fp_current;
+		/* Populate the fingerprint */
+		fp_current->fingerprint_id = 0;
+		fp_current->desc_length = strlen("Dynamic ") + strlen(hostname) + 7; // 7 should cover the max uint16_t + space
+		fp_current->desc = malloc(fp_current->desc_length);
+		sprintf(fp_current->desc, "Dynamic %s %d", hostname, newsig_count);
+		fp_current->record_tls_version = packet_fp.record_tls_version;
+	  fp_current->tls_version = packet_fp.tls_version;
+	  fp_current->ciphersuite_length = packet_fp.ciphersuite_length;
+		fp_current->compression_length = packet_fp.compression_length; // Actually *IS* a uint8_t field!!!  ZOMG
+	  fp_current->extensions_length = (ext_count * 2);
+	  fp_current->curves_length = packet_fp.e_curves_length;
+		fp_current->sig_alg_length = packet_fp.sig_alg_length;
+		fp_current->ec_point_fmt_length = packet_fp.ec_point_fmt_length;
+		// XXX This little malloc fest should be rolled into one.
+		fp_current->ciphersuite = malloc(fp_current->ciphersuite_length);
+	  fp_current->compression = malloc(fp_current->compression_length);
+  	fp_current->extensions = malloc(fp_current->extensions_length);
+	  fp_current->curves = malloc(fp_current->curves_length);
+  	fp_current->sig_alg = malloc(fp_current->sig_alg_length);
+	  fp_current->ec_point_fmt = malloc(fp_current->ec_point_fmt_length);
+		// Copy the data over (except extensions)
+		memcpy(fp_current->ciphersuite, packet_fp.ciphersuite, fp_current->ciphersuite_length);
+		memcpy(fp_current->compression, packet_fp.compression, fp_current->compression_length);
+		memcpy(fp_current->curves, realcurves, fp_current->curves_length);
+		memcpy(fp_current->sig_alg, realsig_alg, fp_current->sig_alg_length);
+		memcpy(fp_current->ec_point_fmt, realec_point_fmt, fp_current->ec_point_fmt_length);
+
+		// Load up the extensions
+		int unarse = 0;
+		for (arse = 0 ; arse < ext_len ;) {
+			fp_current->extensions[unarse] = (uint8_t) packet_fp.extensions[arse];
+			fp_current->extensions[unarse+1] = (uint8_t) packet_fp.extensions[arse+1];
+			unarse += 2;
+			arse = arse + 4 + (packet_fp.extensions[(arse+2)]*256) + (packet_fp.extensions[arse+3]);
 		}
+
+		/* If selected output in the normal stream */
+
+		printf("[%s] New Fingerprint \"%s\": %s connection from %s:%i to ", printable_time, fp_current->desc, ssl_version(packet_fp.tls_version),
+			src_address_buffer, ntohs(tcp->th_sport));
+		printf("%s:%i ", dst_address_buffer, ntohs(tcp->th_dport));
+		printf("Servername: \"");
+		if(packet_fp.server_name != NULL) {
+			for (arse = 7 ; arse <= (packet_fp.server_name[0]*256 + packet_fp.server_name[1]) + 1 ; arse++) {
+				if (packet_fp.server_name[arse] > 0x20 && packet_fp.server_name[arse] < 0x7b)
+					printf("%c", packet_fp.server_name[arse]);
+			}
+		} else {
+			printf("Not Set");
+		}
+		printf("\"\n");
+
 		// Should just for json_fd being /dev/null and skip .. optimisation...
 		// or make an output function linked list XXX
+		snprintf(packet_fp.desc,sizeof(packet_fp.desc),"%s %s:%i -> %s:%i", fp_current->desc, src_address_buffer, ntohs(tcp->th_sport), dst_address_buffer, ntohs(tcp->th_dport));
 		fprintf(json_fd, "{\"id\": %i, \"desc\": \"%s\", ", packet_fp.id, packet_fp.desc);
 		fprintf(json_fd, "\"record_tls_version\": \"0x%.04X\", ", packet_fp.record_tls_version);
 		fprintf(json_fd, "\"tls_version\": \"0x%.04X\", \"ciphersuite_length\": \"0x%.04X\", ",
@@ -725,12 +747,13 @@ int main(int argc, char **argv) {
 	int arg_start = 1, i;
 	struct bpf_program fp;					/* compiled filter program (expression) */
 
-	extern FILE *json_fd, *struct_fd, *unknown_fp_fd, *fpdb_fd;
+	extern FILE *json_fd, *struct_fd, *fpdb_fd;
 	int filesize;
 	struct fingerprint_new *fpdb_new, *fpdb_ptr;
 	uint8_t *fpdb_raw = NULL;
 	int	fp_count = 0;
 	extern int show_drops;
+	extern char hostname[HOST_NAME_MAX];
 	show_drops = 0;
 
 	/* Make sure pipe sees new packets unbuffered. */
@@ -790,13 +813,6 @@ int main(int argc, char **argv) {
 			case 'u':
 				/* User for dropping privileges to */
 				unpriv_user = argv[++i];
-				break;
-			case 'U':
-				/* Output unmatched signatures along with matched (for logging connections, etc) */
-				// XXX Will need neatening in future, but just using an FD for now
-				if((unknown_fp_fd = fopen("/dev/stdout", "a")) == NULL) {
-					printf("Cannot open stdout for writing unmatched fingerprints\n");
-				}
 				break;
 			case 'f':
 				/* Read the *new* *sparkly* *probably broken* :) binary Fingerprint Database from file */
@@ -870,7 +886,7 @@ int main(int argc, char **argv) {
 	/* Check and move past the version header (quit if it's wrong) */
 	if (*fpdb_raw == 0) {
 		fpdb_raw++;
-		fpdb_ptr = fpdb_new = fpdb_raw;
+		fpdb_ptr = fpdb_new = (struct fingerprint_new *) fpdb_raw;
 	} else {
 		printf("Unknown version of FPDB file\n");
 		exit(-1);
@@ -901,7 +917,7 @@ int main(int argc, char **argv) {
 		fp_current->fingerprint_id = (uint16_t) ((uint16_t)*(fpdb_raw+x) << 8) + ((uint8_t)*(fpdb_raw+x+1));
 		x += 2;
 		fp_current->desc_length =  (uint16_t) ((uint16_t)*(fpdb_raw+x) << 8) + ((uint8_t)*(fpdb_raw+x+1));
-		fp_current->desc = fpdb_raw+x+2;
+		fp_current->desc = (char *)fpdb_raw+x+2;
 
 		x += (uint16_t) ((*(fpdb_raw+x) >> 16) + (*(fpdb_raw+x+1)) + 1); // Skip the description
 
@@ -998,6 +1014,10 @@ int main(int argc, char **argv) {
 
 	/* OK, Checks are done, but we still need to set some stuff up before we go looping */
 
+	/* setup hostname variable for use in logs (incase of multiple hosts) */
+	if(gethostname(hostname, HOST_NAME_MAX) != 0) {
+		sprintf(hostname, "unknown");
+	}
 
 
 	/* now we can set our callback function */

@@ -56,33 +56,6 @@ mistakes, kthnxbai.
 /* is the fpdb management stuff */
 //#include "fpdb.c"
 
-/* Binary compare *first with *second for length bytes */
-int binary_compare(uint8_t *first, uint8_t *second, int length) {
-		int x;
-		/* Non-existant field needs to be dealt with before counting fun */
-		/* We have already checked that lengths match */
-		if (length == 0) {
-			return 1;
-		}
-
-		for(x = 0 ; x < length ; x++) {
-			if(*first != *second) {
-				break;
-			} else {
-				//printf("%02X:%02X ", *first, *second);
-				first++;
-				second++;
-			}
-		}
-		//printf("\n");
-		if (x == length) {
-			return 1;
-		} else {
-			return 0;
-		}
-}
-
-
 /* Compare extensions in packet *packet with fingerprint *fingerprint */
 int extensions_compare(uint8_t *packet, uint8_t *fingerprint, int length, int count) {
 	/* XXX check that all things passed to this _are_ uint8_t and we're not only partially checking stuff that may be longer!!!! */
@@ -549,12 +522,12 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 			(packet_fp.sig_alg_length == fp_current->sig_alg_length) &&
 			(packet_fp.ec_point_fmt_length == fp_current->ec_point_fmt_length) &&
 
-			binary_compare(packet_fp.ciphersuite, fp_current->ciphersuite, fp_current->ciphersuite_length) &&
-			binary_compare(packet_fp.compression, fp_current->compression, fp_current->compression_length) &&
+			!(bcmp(packet_fp.ciphersuite, fp_current->ciphersuite, fp_current->ciphersuite_length)) &&
+			!(bcmp(packet_fp.compression, fp_current->compression, fp_current->compression_length)) &&
 			extensions_compare(packet_fp.extensions, fp_current->extensions, ext_len, fp_current->extensions_length) &&
-			binary_compare(realcurves, fp_current->curves, fp_current->curves_length) &&
-			binary_compare(realsig_alg, fp_current->sig_alg, fp_current->sig_alg_length) &&
-			binary_compare(realec_point_fmt, fp_current->ec_point_fmt, fp_current->ec_point_fmt_length)) {
+			!(bcmp(realcurves, fp_current->curves, fp_current->curves_length)) &&
+			!(bcmp(realsig_alg, fp_current->sig_alg, fp_current->sig_alg_length)) &&
+			!(bcmp(realec_point_fmt, fp_current->ec_point_fmt, fp_current->ec_point_fmt_length))) {
 
 				/* Whole criteria match.... woo! */
 				matchcount++;

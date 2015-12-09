@@ -146,7 +146,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 	/* Different to struct fingerprint in fpdb.h, this is for building new fingerprints */
 	struct tmp_fingerprint {
 		uint16_t 	id;
-		char 			desc[128];
+		char 			desc[312];
 		uint16_t 	record_tls_version;
 		uint16_t 	tls_version;
 		uint16_t 	ciphersuite_length;
@@ -168,6 +168,10 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 	/* ************************************* */
 	/* Anything we need from the pcap_pkthdr */
 	/* ************************************* */
+
+	/* In theory time doesn't need to be first because it's saved in the PCAP
+		 header, however I am keeping it here incase we derive it from somewhere
+		 else in future and we want it early in the process. */
 
 	packet_time = pcap_header->ts;
 	print_time = *localtime(&packet_time.tv_sec);
@@ -352,7 +356,6 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		inet_ntop(af_type,(void*)&ipv6->ip6_dst,dst_address_buffer,sizeof(dst_address_buffer));
 	}
 
-	snprintf(packet_fp.desc,sizeof(packet_fp.desc),"Unknown: %s:%i -> %s:%i", src_address_buffer, ntohs(tcp->th_sport), dst_address_buffer, ntohs(tcp->th_dport));
 
 	/* TLS Version (Record Layer - not proper proper) */
 	packet_fp.record_tls_version = (payload[1]*256) + payload[2];
@@ -627,6 +630,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 
 		// Should just for json_fd being /dev/null and skip .. optimisation...
 		// or make an output function linked list XXX
+		snprintf(packet_fp.desc,sizeof(packet_fp.desc),"%s %s:%i -> %s:%i", fp_current->desc, src_address_buffer, ntohs(tcp->th_sport), dst_address_buffer, ntohs(tcp->th_dport));
 		fprintf(json_fd, "{\"id\": %i, \"desc\": \"%s\", ", packet_fp.id, packet_fp.desc);
 		fprintf(json_fd, "\"record_tls_version\": \"0x%.04X\", ", packet_fp.record_tls_version);
 		fprintf(json_fd, "\"tls_version\": \"0x%.04X\", \"ciphersuite_length\": \"0x%.04X\", ",

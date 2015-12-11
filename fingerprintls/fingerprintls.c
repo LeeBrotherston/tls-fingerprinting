@@ -542,7 +542,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 
 				/* Whole criteria match.... woo! */
 				matchcount++;
-				printf("[%s] Fingerprint Matched: \"%s\" %s connection from %s:%i to ", printable_time, fp_current->desc, ssl_version(fp_current->tls_version),
+				printf("[%s] Fingerprint Matched: \"%.*s\" %s connection from %s:%i to ", printable_time, fp_current->desc_length ,fp_current->desc, ssl_version(fp_current->tls_version),
 					src_address_buffer, ntohs(tcp->th_sport));
 				printf("%s:%i ", dst_address_buffer, ntohs(tcp->th_dport));
 				printf("Servername: \"");

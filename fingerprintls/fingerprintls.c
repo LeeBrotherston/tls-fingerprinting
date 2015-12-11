@@ -124,7 +124,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 	/* Variables, gotta have variables, and structs and pointers....  and things */
 	/* ************************************************************************* */
 
-	extern FILE *json_fd, *struct_fd;
+	extern FILE *json_fd;
 	extern int newsig_count;
 	extern char hostname[HOST_NAME_MAX];
 
@@ -755,9 +755,9 @@ int main(int argc, char **argv) {
 	int arg_start = 1, i;
 	extern struct bpf_program fp;					/* compiled filter program (expression) */
 
-	extern FILE *json_fd, *struct_fd, *fpdb_fd;
+	extern FILE *json_fd, *fpdb_fd;
 	int filesize;
-	struct fingerprint_new *fpdb_new, *fpdb_ptr;
+	struct fingerprint_new *fpdb_new;
 	uint8_t *fpdb_raw = NULL;
 	int	fp_count = 0;
 	extern int show_drops;
@@ -901,7 +901,7 @@ int main(int argc, char **argv) {
 	/* Check and move past the version header (quit if it's wrong) */
 	if (*fpdb_raw == 0) {
 		fpdb_raw++;
-		fpdb_ptr = fpdb_new = (struct fingerprint_new *) fpdb_raw;
+		fpdb_new = (struct fingerprint_new *) fpdb_raw;
 	} else {
 		printf("Unknown version of FPDB file\n");
 		exit(-1);

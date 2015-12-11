@@ -757,7 +757,6 @@ int main(int argc, char **argv) {
 
 	extern FILE *json_fd, *fpdb_fd;
 	int filesize;
-	struct fingerprint_new *fpdb_new;
 	uint8_t *fpdb_raw = NULL;
 	int	fp_count = 0;
 	extern int show_drops;
@@ -901,7 +900,6 @@ int main(int argc, char **argv) {
 	/* Check and move past the version header (quit if it's wrong) */
 	if (*fpdb_raw == 0) {
 		fpdb_raw++;
-		fpdb_new = (struct fingerprint_new *) fpdb_raw;
 	} else {
 		printf("Unknown version of FPDB file\n");
 		exit(-1);

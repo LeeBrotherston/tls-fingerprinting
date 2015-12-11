@@ -89,18 +89,7 @@ int extensions_compare(uint8_t *packet, uint8_t *fingerprint, int length, int co
 }
 
 
-/* Externals */
-int newsig_count;
-int show_drops;
-FILE *json_fd = NULL;
-FILE *fpdb_fd = NULL;
-struct fingerprint_new *fp_first;
-char hostname[HOST_NAME_MAX];			/* store the hostname once to save multiple lookups */
 
-/* These were in main, but this let's the signal handler close as needed */
-pcap_t *handle = NULL;						/* packet capture handle */
-struct bpf_program fp;					/* compiled filter program (expression) */
-/* --------------------------------------------------------------------- */
 
 // XXX Currently a bug if -U is not set
 
@@ -934,7 +923,7 @@ int main(int argc, char **argv) {
 			fp_current = fp_current->next;
 		}
 
-		//  Mini-crib sheet
+		// Mini-crib sheet
 		// var - pointer address
 		// *var - value stored at pointer address
 

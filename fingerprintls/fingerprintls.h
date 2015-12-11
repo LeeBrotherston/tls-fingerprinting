@@ -152,5 +152,25 @@ char *default_filter = "(tcp[tcp[12]/16*4]=22 and (tcp[tcp[12]/16*4+5]=1) and (t
 // Disabled for now becuase it's too noisey... too many false positives
 //char *default_filter = "(tcp[tcp[12]/16*4]=22 and (tcp[tcp[12]/16*4+5]=1)) or ((tcp[tcp[12]/16*4+2]=1) and ((tcp[tcp[12]/16*4+3]=3) or (tcp[tcp[12]/16*4+3]=0)))";
 
+/* --------- */
+/* Externals */
+/* --------- */
+int newsig_count;
+int show_drops;
+FILE *json_fd = NULL;
+FILE *fpdb_fd = NULL;
+struct fingerprint_new *fp_first;
+char hostname[HOST_NAME_MAX];			/* store the hostname once to save multiple lookups */
 
+/* These were in main, but this let's the signal handler close as needed */
+pcap_t *handle = NULL;						/* packet capture handle */
+struct bpf_program fp;					/* compiled filter program (expression) */
+/* --------------------------------------------------------------------- */
+
+
+// Declare all the functions
 int register_signals();
+void sig_handler (int signo);
+int extensions_compare(uint8_t *packet, uint8_t *fingerprint, int length, int count);
+void print_usage(char *bin_name);
+void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_char *packet);

@@ -46,6 +46,12 @@ mistakes, kthnxbai.
 /* For TimeStamping from pcap_pkthdr */
 #include <time.h>
 
+/* For the signal handler stuff */
+#include <signal.h>
+
+/* And my own signal handler functions */
+#include "signal.c"
+
 /* My own header sherbizzle */
 #include "fingerprintls.h"
 
@@ -72,9 +78,18 @@ int extensions_compare(uint8_t *packet, uint8_t *fingerprint, int length, int co
 		}
 	}
 	return retval;
+
+	/*
+		Experimenting with fuzzy matches as certain extensions can vary with one client (looking at you Chrome!)
+		0x7550 - "TLS Channel ID" - https://tools.ietf.org/html/draft-balfanz-tls-channelid-01.  Used for binding authentication tokens, extensions_compare
+		0x0015 - "Padding" - Can totally discard this, because padding.
+		0x0010 - "Application-Layer Protocol Negotiation" - https://tools.ietf.org/html/rfc7301
+
+	*/
 }
 
 
+/* Externals */
 int newsig_count;
 int show_drops;
 FILE *json_fd = NULL;
@@ -82,6 +97,10 @@ FILE *fpdb_fd = NULL;
 struct fingerprint_new *fp_first;
 char hostname[HOST_NAME_MAX];			/* store the hostname once to save multiple lookups */
 
+/* These were in main, but this let's the signal handler close as needed */
+pcap_t *handle = NULL;						/* packet capture handle */
+struct bpf_program fp;					/* compiled filter program (expression) */
+/* --------------------------------------------------------------------- */
 
 // XXX Currently a bug if -U is not set
 
@@ -741,11 +760,11 @@ int main(int argc, char **argv) {
 	char *dev = NULL;					/* capture device name */
 	char *unpriv_user = NULL;					/* User for dropping privs */
 	char errbuf[PCAP_ERRBUF_SIZE];				/* error buffer */
-	pcap_t *handle = NULL;						/* packet capture handle */
+	extern pcap_t *handle;						/* packet capture handle */
 
 	char *filter_exp = default_filter;
 	int arg_start = 1, i;
-	struct bpf_program fp;					/* compiled filter program (expression) */
+	extern struct bpf_program fp;					/* compiled filter program (expression) */
 
 	extern FILE *json_fd, *struct_fd, *fpdb_fd;
 	int filesize;
@@ -860,6 +879,13 @@ int main(int argc, char **argv) {
 			fprintf(stderr, "Changed UID successfully\n");
 		}
 	}
+
+	// Register signal Handlers
+	if(!(register_signals())) {
+		printf("Could not register signal handlers\n");
+		exit(0);
+	}
+
 
 	/* XXX Temporary home, but need to test as early in the cycle as possible for now */
 	/* Load binary rules blob and parse */

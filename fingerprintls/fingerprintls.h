@@ -151,3 +151,6 @@ char *default_filter = "(tcp[tcp[12]/16*4]=22 and (tcp[tcp[12]/16*4+5]=1) and (t
 /* This pushes a bunch of pre-processing out to the BPF filter instead of having to deal with it too much in code */
 // Disabled for now becuase it's too noisey... too many false positives
 //char *default_filter = "(tcp[tcp[12]/16*4]=22 and (tcp[tcp[12]/16*4+5]=1)) or ((tcp[tcp[12]/16*4+2]=1) and ((tcp[tcp[12]/16*4+3]=3) or (tcp[tcp[12]/16*4+3]=0)))";
+
+
+int register_signals();

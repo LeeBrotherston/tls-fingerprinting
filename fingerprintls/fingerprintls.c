@@ -515,7 +515,10 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 	/* ************************* */
 	/* New Matching thinger test */
 	/* ************************* */
-	for(fp_current = fp_first ; fp_current != NULL; fp_current = fp_current->next) {
+	//for(fp_current = fp_first ; fp_current != NULL; fp_current = fp_current->next) {
+	for(fp_current = search[((packet_fp.ciphersuite_length & 0x000F) >> 1 )][((packet_fp.tls_version) & 0x00FF)] ;
+		fp_current != NULL; fp_current = fp_current->next) {
+
 		//printf("Trying... %.*s\n", fp_current->desc_length, fp_current->desc);
 		if ((packet_fp.record_tls_version == fp_current->record_tls_version) &&
 			(packet_fp.tls_version == fp_current->tls_version) &&
@@ -582,8 +585,8 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		// XXX Should really check if malloc works ;)
 		fp_current = malloc(sizeof(struct fingerprint_new));
 		/* Update pointers, put top of list */
-		fp_current->next = fp_first;
-		fp_first = fp_current;
+		fp_current->next = search[((packet_fp.ciphersuite_length & 0x000F) >> 1 )][((packet_fp.tls_version) & 0x00FF)];
+		search[((packet_fp.ciphersuite_length & 0x000F) >> 1 )][((packet_fp.tls_version) & 0x00FF)] = fp_current;
 		/* Populate the fingerprint */
 		fp_current->fingerprint_id = 0;
 		fp_current->desc_length = strlen("Dynamic ") + strlen(hostname) + 7; // 7 should cover the max uint16_t + space
@@ -840,7 +843,7 @@ int main(int argc, char **argv) {
 
 	/* Checks required directly after switches are set */
 
-	/* Fingerprint DB load */
+	/* Fingerprint DB to load */
 	/* This needs to be before the priv drop in case the fingerprint db requires root privs to read */
 	if(fpdb_fd == NULL) {
 		/* No filename set, trying the current directory */
@@ -905,25 +908,25 @@ int main(int argc, char **argv) {
 		exit(-1);
 	}
 
-	int x;
-	extern struct fingerprint_new *fp_first;
+	int x, y;
+	//extern struct fingerprint_new *fp_first;
 	struct fingerprint_new *fp_current;
+	extern struct fingerprint_new *search[8][4];
+
+	/* Initialise so that we know when we are on the first in any one chain */
+	for (x = 0 ; x < 8 ; x++) {
+		for (y = 0 ; y < 4 ; y++) {
+			search[x][y] = NULL;
+		}
+	}
 
 	/* Filesize -1 because of the header, loops through the file, one loop per fingerprint */
 	for (x = 0 ; x < (filesize-1) ; fp_count++) {
 		/* Allocating one my one instead of in a block, may revise this plan later */
-		if(x == 0) {
-			/* Allocate first struct and set the pointer to first */
-			fp_current = fp_first = malloc(sizeof(struct fingerprint_new));
-		} else {
-			/* Allocate a new strcut and set pointer from the previous */
-			fp_current->next = malloc(sizeof(struct fingerprint_new));
-			fp_current = fp_current->next;
-		}
+		/* This will only save time on startup as opposed to during operation though */
 
-		// Mini-crib sheet
-		// var - pointer address
-		// *var - value stored at pointer address
+		/* Allocate out the memory for the one signature */
+		fp_current = malloc(sizeof(struct fingerprint_new));
 
 		// XXX consider copied (i.e. length) values being free'd to save a little RAM here and there <-- future thing
 
@@ -982,6 +985,14 @@ int main(int argc, char **argv) {
 		}
 		x += (uint16_t)((*(fpdb_raw+x) >> 16) + *(fpdb_raw+x+1))+2;
 
+		/* Multi-array of pointers to appropriate (smaller) list */
+		/* XXX This should still be ordered for faster search */
+		if(search[((fp_current->ciphersuite_length & 0x000F) >> 1 )][((fp_current->tls_version) & 0x00FF)] == NULL) {
+			search[((fp_current->ciphersuite_length & 0x000F) >> 1 )][((fp_current->tls_version) & 0x00FF)] = fp_current;
+		} else {
+			fp_current->next = search[((fp_current->ciphersuite_length & 0x000F) >> 1 )][((fp_current->tls_version) & 0x00FF)];
+			search[((fp_current->ciphersuite_length & 0x000F) >> 1 )][((fp_current->tls_version) & 0x00FF)] = fp_current;
+		}
 	}
 	/* Terminate the linked list */
 	fp_current->next = NULL;

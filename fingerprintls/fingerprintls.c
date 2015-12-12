@@ -26,7 +26,7 @@ mistakes, kthnxbai.
 
 // TODO
 // XXX Add UDP support (in theory very easy)
-// XXX add some indexing stuff to fingerprint database instead of searching array in order
+// XXX enhance search to include sorting per list/thread/shard/thingy
 // XXX add 6in4 support (should be as simple as UDP and IPv6... in theory)
 
 #include <pcap.h>
@@ -55,9 +55,6 @@ mistakes, kthnxbai.
 /* My own header sherbizzle */
 #include "fingerprintls.h"
 
-/* Statically compiled Fingerprint DB (sorryNotSorry) */
-/* #include "fpdb.h" */
-
 /* Going to start breaking this up into neater functions/files.  The first of which */
 /* is the fpdb management stuff */
 //#include "fpdb.c"
@@ -65,11 +62,31 @@ mistakes, kthnxbai.
 /* Compare extensions in packet *packet with fingerprint *fingerprint */
 int extensions_compare(uint8_t *packet, uint8_t *fingerprint, int length, int count) {
 	/* XXX check that all things passed to this _are_ uint8_t and we're not only partially checking stuff that may be longer!!!! */
+	/*
+		Return values are:
+		0 - No match
+		1 - Exact match
+		2 - Fuzzy match
+	*/
 	int x = 0;
 	int y = 0;
 	int retval = 1;
 	for (; x < length ;) {
 		if (((uint8_t) packet[x] != fingerprint[y] ) || ((uint8_t) packet[x+1] != fingerprint[y+1])) {
+			/* Perform a fuzzy search on "optional" extensions here */
+			/*
+
+			Experimenting with fuzzy matches as certain extensions can vary with one client (looking at you Chrome!)
+			0x7550 - "TLS Channel ID" - https://tools.ietf.org/html/draft-balfanz-tls-channelid-01.  Used for binding authentication tokens, extensions_compare
+			0x0015 - "Padding" - Can totally discard this, because padding.
+			0x0010 - "Application-Layer Protocol Negotiation" - https://tools.ietf.org/html/rfc7301
+
+			switch() {
+				case 0x7550:
+				case 0x0015:
+				case 0x0010:
+			}
+			*/
 			retval = 0;
 			break;
 		} else {
@@ -78,20 +95,8 @@ int extensions_compare(uint8_t *packet, uint8_t *fingerprint, int length, int co
 		}
 	}
 	return retval;
-
-	/*
-		Experimenting with fuzzy matches as certain extensions can vary with one client (looking at you Chrome!)
-		0x7550 - "TLS Channel ID" - https://tools.ietf.org/html/draft-balfanz-tls-channelid-01.  Used for binding authentication tokens, extensions_compare
-		0x0015 - "Padding" - Can totally discard this, because padding.
-		0x0010 - "Application-Layer Protocol Negotiation" - https://tools.ietf.org/html/rfc7301
-
-	*/
 }
 
-
-
-
-// XXX Currently a bug if -U is not set
 
 /*
  * print help text

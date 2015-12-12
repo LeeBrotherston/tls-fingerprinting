@@ -26,7 +26,7 @@ mistakes, kthnxbai.
 
 // TODO
 // XXX Add UDP support (in theory very easy)
-// XXX add some indexing stuff to fingerprint database instead of searching array in order
+// XXX enhance search to include sorting per list/thread/shard/thingy
 // XXX add 6in4 support (should be as simple as UDP and IPv6... in theory)
 
 #include <pcap.h>
@@ -55,9 +55,6 @@ mistakes, kthnxbai.
 /* My own header sherbizzle */
 #include "fingerprintls.h"
 
-/* Statically compiled Fingerprint DB (sorryNotSorry) */
-/* #include "fpdb.h" */
-
 /* Going to start breaking this up into neater functions/files.  The first of which */
 /* is the fpdb management stuff */
 //#include "fpdb.c"
@@ -65,11 +62,31 @@ mistakes, kthnxbai.
 /* Compare extensions in packet *packet with fingerprint *fingerprint */
 int extensions_compare(uint8_t *packet, uint8_t *fingerprint, int length, int count) {
 	/* XXX check that all things passed to this _are_ uint8_t and we're not only partially checking stuff that may be longer!!!! */
+	/*
+		Return values are:
+		0 - No match
+		1 - Exact match
+		2 - Fuzzy match
+	*/
 	int x = 0;
 	int y = 0;
 	int retval = 1;
 	for (; x < length ;) {
 		if (((uint8_t) packet[x] != fingerprint[y] ) || ((uint8_t) packet[x+1] != fingerprint[y+1])) {
+			/* Perform a fuzzy search on "optional" extensions here */
+			/*
+
+			Experimenting with fuzzy matches as certain extensions can vary with one client (looking at you Chrome!)
+			0x7550 - "TLS Channel ID" - https://tools.ietf.org/html/draft-balfanz-tls-channelid-01.  Used for binding authentication tokens, extensions_compare
+			0x0015 - "Padding" - Can totally discard this, because padding.
+			0x0010 - "Application-Layer Protocol Negotiation" - https://tools.ietf.org/html/rfc7301
+
+			switch() {
+				case 0x7550:
+				case 0x0015:
+				case 0x0010:
+			}
+			*/
 			retval = 0;
 			break;
 		} else {
@@ -78,20 +95,8 @@ int extensions_compare(uint8_t *packet, uint8_t *fingerprint, int length, int co
 		}
 	}
 	return retval;
-
-	/*
-		Experimenting with fuzzy matches as certain extensions can vary with one client (looking at you Chrome!)
-		0x7550 - "TLS Channel ID" - https://tools.ietf.org/html/draft-balfanz-tls-channelid-01.  Used for binding authentication tokens, extensions_compare
-		0x0015 - "Padding" - Can totally discard this, because padding.
-		0x0010 - "Application-Layer Protocol Negotiation" - https://tools.ietf.org/html/rfc7301
-
-	*/
 }
 
-
-
-
-// XXX Currently a bug if -U is not set
 
 /*
  * print help text
@@ -515,7 +520,10 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 	/* ************************* */
 	/* New Matching thinger test */
 	/* ************************* */
-	for(fp_current = fp_first ; fp_current != NULL; fp_current = fp_current->next) {
+	//for(fp_current = fp_first ; fp_current != NULL; fp_current = fp_current->next) {
+	for(fp_current = search[((packet_fp.ciphersuite_length & 0x000F) >> 1 )][((packet_fp.tls_version) & 0x00FF)] ;
+		fp_current != NULL; fp_current = fp_current->next) {
+
 		//printf("Trying... %.*s\n", fp_current->desc_length, fp_current->desc);
 		if ((packet_fp.record_tls_version == fp_current->record_tls_version) &&
 			(packet_fp.tls_version == fp_current->tls_version) &&
@@ -582,8 +590,8 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		// XXX Should really check if malloc works ;)
 		fp_current = malloc(sizeof(struct fingerprint_new));
 		/* Update pointers, put top of list */
-		fp_current->next = fp_first;
-		fp_first = fp_current;
+		fp_current->next = search[((packet_fp.ciphersuite_length & 0x000F) >> 1 )][((packet_fp.tls_version) & 0x00FF)];
+		search[((packet_fp.ciphersuite_length & 0x000F) >> 1 )][((packet_fp.tls_version) & 0x00FF)] = fp_current;
 		/* Populate the fingerprint */
 		fp_current->fingerprint_id = 0;
 		fp_current->desc_length = strlen("Dynamic ") + strlen(hostname) + 7; // 7 should cover the max uint16_t + space
@@ -840,7 +848,7 @@ int main(int argc, char **argv) {
 
 	/* Checks required directly after switches are set */
 
-	/* Fingerprint DB load */
+	/* Fingerprint DB to load */
 	/* This needs to be before the priv drop in case the fingerprint db requires root privs to read */
 	if(fpdb_fd == NULL) {
 		/* No filename set, trying the current directory */
@@ -905,25 +913,25 @@ int main(int argc, char **argv) {
 		exit(-1);
 	}
 
-	int x;
-	extern struct fingerprint_new *fp_first;
+	int x, y;
+	//extern struct fingerprint_new *fp_first;
 	struct fingerprint_new *fp_current;
+	extern struct fingerprint_new *search[8][4];
+
+	/* Initialise so that we know when we are on the first in any one chain */
+	for (x = 0 ; x < 8 ; x++) {
+		for (y = 0 ; y < 4 ; y++) {
+			search[x][y] = NULL;
+		}
+	}
 
 	/* Filesize -1 because of the header, loops through the file, one loop per fingerprint */
 	for (x = 0 ; x < (filesize-1) ; fp_count++) {
 		/* Allocating one my one instead of in a block, may revise this plan later */
-		if(x == 0) {
-			/* Allocate first struct and set the pointer to first */
-			fp_current = fp_first = malloc(sizeof(struct fingerprint_new));
-		} else {
-			/* Allocate a new strcut and set pointer from the previous */
-			fp_current->next = malloc(sizeof(struct fingerprint_new));
-			fp_current = fp_current->next;
-		}
+		/* This will only save time on startup as opposed to during operation though */
 
-		// Mini-crib sheet
-		// var - pointer address
-		// *var - value stored at pointer address
+		/* Allocate out the memory for the one signature */
+		fp_current = malloc(sizeof(struct fingerprint_new));
 
 		// XXX consider copied (i.e. length) values being free'd to save a little RAM here and there <-- future thing
 
@@ -982,6 +990,14 @@ int main(int argc, char **argv) {
 		}
 		x += (uint16_t)((*(fpdb_raw+x) >> 16) + *(fpdb_raw+x+1))+2;
 
+		/* Multi-array of pointers to appropriate (smaller) list */
+		/* XXX This should still be ordered for faster search */
+		if(search[((fp_current->ciphersuite_length & 0x000F) >> 1 )][((fp_current->tls_version) & 0x00FF)] == NULL) {
+			search[((fp_current->ciphersuite_length & 0x000F) >> 1 )][((fp_current->tls_version) & 0x00FF)] = fp_current;
+		} else {
+			fp_current->next = search[((fp_current->ciphersuite_length & 0x000F) >> 1 )][((fp_current->tls_version) & 0x00FF)];
+			search[((fp_current->ciphersuite_length & 0x000F) >> 1 )][((fp_current->tls_version) & 0x00FF)] = fp_current;
+		}
 	}
 	/* Terminate the linked list */
 	fp_current->next = NULL;

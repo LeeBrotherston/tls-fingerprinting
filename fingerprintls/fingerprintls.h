@@ -34,7 +34,7 @@ mistakes, kthnxbai.
 #define HOST_NAME_MAX 255
 
 /* Ethernet addresses are 6 bytes */
-//#define ETHER_ADDR_LEN	6
+// #define ETHER_ADDR_LEN	6
 
 /* Ethernet header */
 struct sniff_ethernet {
@@ -159,7 +159,7 @@ int newsig_count;
 int show_drops;
 FILE *json_fd = NULL;
 FILE *fpdb_fd = NULL;
-struct fingerprint_new *fp_first;
+struct fingerprint_new *search[8][4];
 char hostname[HOST_NAME_MAX];			/* store the hostname once to save multiple lookups */
 
 /* These were in main, but this let's the signal handler close as needed */

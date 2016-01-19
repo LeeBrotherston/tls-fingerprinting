@@ -25,13 +25,18 @@ mistakes, kthnxbai.
 */
 
 /* default snap length (maximum bytes per packet to capture) */
-#define SNAP_LEN 1518
+#define SNAP_LEN 1522
 
 /* ethernet headers are always exactly 14 bytes [1] */
 #define SIZE_ETHERNET 14
 
 /* Max hostname length */
 #define HOST_NAME_MAX 255
+
+/* Thread count (make this based on cores or something in future) */
+#define THREAD_COUNT 4
+pthread_t threads[THREAD_COUNT];
+
 
 /* Ethernet addresses are 6 bytes */
 // #define ETHER_ADDR_LEN	6
@@ -93,8 +98,6 @@ struct tcp_header {
         u_short th_urp;                 /* urgent pointer */
 };
 
-void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *packet);
-
 #define SSL_MIN_GOOD_VERSION	0x002
 #define SSL_MAX_GOOD_VERSION	0x304
 
@@ -142,6 +145,17 @@ struct fingerprint_new {
   struct    fingerprint_new  *next;
 };
 
+/* pthreads only allow a single argument to be passed, the thread number, so we'll create an array of these
+   the thread can look up it's corresponding "number" in the array and obtain it's own config options */
+
+struct pthread_config {
+  /* Everything from the original args ... except args, because lol */
+  struct pcap_pkthdr *pcap_header;
+  u_char *packet;
+  struct pthread_config *next;
+  uint8_t status; //  XXX The location of this in struct affects if it works.... this is... wrong... hardcoded poop elsewhere?
+} *pthread_config_ptr;
+
 
 
 /* This works perfectly well for TLS, but does not catch horrible SSLv2 packets, soooooo.... */
@@ -173,4 +187,4 @@ int register_signals();
 void sig_handler (int signo);
 int extensions_compare(uint8_t *packet, uint8_t *fingerprint, int length, int count);
 void print_usage(char *bin_name);
-void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_char *packet);
+void got_packet(u_char *args, struct pcap_pkthdr *pcap_header, u_char *packet);

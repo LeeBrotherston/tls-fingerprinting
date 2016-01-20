@@ -6,7 +6,7 @@ compiler:
 addons:
   apt:
     packages:
-      - libpcap
+      - libpcap-dev
 
 script: cd $TEST_DIR && make
 

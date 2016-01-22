@@ -754,10 +754,10 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 
 int main(int argc, char **argv) {
 
-	char *dev = NULL;					/* capture device name */
-	char *unpriv_user = NULL;					/* User for dropping privs */
+	char *dev = NULL;											/* capture device name */
+	char *unpriv_user = NULL;							/* User for dropping privs */
 	char errbuf[PCAP_ERRBUF_SIZE];				/* error buffer */
-	extern pcap_t *handle;						/* packet capture handle */
+	extern pcap_t *handle;								/* packet capture handle */
 
 	char *filter_exp = default_filter;
 	int arg_start = 1, i;

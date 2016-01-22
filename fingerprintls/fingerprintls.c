@@ -58,6 +58,7 @@ mistakes, kthnxbai.
 /* My own header sherbizzle */
 #include "fingerprintls.h"
 
+/* Stuff to process packets */
 #include "packet_pthread.c"
 
 /* Compare extensions in packet *packet with fingerprint *fingerprint */
@@ -128,15 +129,14 @@ void output() {
 void packet_queue_handler(u_char *args, const struct pcap_pkthdr *pcap_header, const u_char *packet) {
 
 	/* Quick and dirty, just throw the whole thing into a pthread */
-	struct pthread_config *my_thread_config;
-
-	my_thread_config =  pthread_config_ptr;
+	//extern struct pthread_config *my_thread_config;
 
 	/* Copy things to new locations */
 	if(my_thread_config->status != 0) {
 		printf("Thread not ready\n");
 		// XXX deal with here
 	} else {
+		printf("Say what: #%i\n", my_thread_config->threadnum);
 		memcpy(my_thread_config->pcap_header, pcap_header, sizeof(&pcap_header));
 		memcpy(my_thread_config->packet, packet, pcap_header->len);
 		my_thread_config->status = 1;  // Set flag for thread to pickup packet
@@ -146,26 +146,26 @@ void packet_queue_handler(u_char *args, const struct pcap_pkthdr *pcap_header, c
 
 }
 
-
+//  Need to work out local vs extern use of my_thread_config XXX ....  2 functions using it could cause thread issues
 
 void *packet_pthread (void *thread_num) {
 	int thread_counter;
-	struct pthread_config *my_thread_config;
+	struct pthread_config *local_thread_config;
 
 	/* Get "my" config (as opposed to other threads) before doing anything else */
 	printf("Initialising thread #%i\n", (int) thread_num);
-	my_thread_config = pthread_config_ptr;
+	local_thread_config = pthread_config_ptr;
 	for(thread_counter = 0 ; thread_counter < (int) thread_num ; thread_counter++)
-		my_thread_config++;
+		local_thread_config = local_thread_config->next;
 
 	/* For this test, we'll just while loop it */
 	while(1) {
 		printf("Loop thread #%i\n", (int) thread_num);
 
-		if(my_thread_config->status == 1) {
+		if(local_thread_config->status == 1) {
 			printf("packet_pthread #%i\n", (int)  thread_num);
-			got_packet((u_char *) NULL, my_thread_config->pcap_header, my_thread_config->packet);
-			my_thread_config->status = 0;
+			got_packet((u_char *) NULL, local_thread_config->pcap_header, local_thread_config->packet);
+			local_thread_config->status = 0;
 		} else {
 			sleep(1);
 		}
@@ -480,20 +480,39 @@ int main(int argc, char **argv) {
 
 	/* Create pthread configs.  Doing this before spawning the threads in case it causes issues somehow */
 	struct pthread_config *working_pthread_config;
-	working_pthread_config = pthread_config_ptr = calloc(THREAD_COUNT, sizeof(struct pthread_config));
+	extern struct pthread_config *next_thread_config;
+	my_thread_config = working_pthread_config = pthread_config_ptr = calloc(1, sizeof(struct pthread_config));
 	for(x = 0; x < THREAD_COUNT; x++) {
+		printf("setting up thread config #%i\n", x);
 		/* Will need to make the size of buffer configurable in future, sticking with 10 packets for now */
 		working_pthread_config->pcap_header = calloc(1, sizeof(struct pcap_pkthdr));
 		working_pthread_config->packet = calloc(1, SNAP_LEN);
-		working_pthread_config->next = working_pthread_config++;
 		working_pthread_config->status = 0;
+		working_pthread_config->threadnum = x; // Aids debugging if we can tell which thread did what
+
+		if(x < (THREAD_COUNT-1)) {
+			printf("boom!\n");
+			//working_pthread_config->next = working_pthread_config + sizeof(struct pthread_config);
+			//working_pthread_config = working_pthread_config->next;
+			working_pthread_config->next = calloc(1, sizeof(struct pthread_config));
+			working_pthread_config = working_pthread_config->next;
+		} else {
+			printf("kablam!\n");
+			/* This is circular, so the packet quererer can just next, next, next, next the whole time
+			   This way it needs to knowledge of how many, etc.  Something else could add them in and out
+				 and reorder as necessary */
+			working_pthread_config->next = pthread_config_ptr;
+		}
 		/* initialise the pthread mutex used for buffer management */
 		/* pthread_cond_init(working_pthread_config->queue_empty, NULL); */
 	}
-	/* This is circular, so the packet quererer can just next, next, next, next the whole time
-	   This way it needs to knowledge of how many, etc.  Something else could add them in and out
-		 and reorder as necessary */
-	working_pthread_config->next = pthread_config_ptr;
+
+	printf("testing thread config structure...\n");
+	working_pthread_config = pthread_config_ptr;
+	for(x = 0; x < (THREAD_COUNT * 2); x++ ) {
+		printf("Test #%i\n", working_pthread_config->threadnum);
+		working_pthread_config = working_pthread_config->next;
+	}
 
 
 	/* Create the threads, with their thread id thing */

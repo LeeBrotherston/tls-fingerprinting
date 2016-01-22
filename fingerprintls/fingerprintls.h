@@ -153,7 +153,8 @@ struct pthread_config {
   struct pcap_pkthdr *pcap_header;
   u_char *packet;
   struct pthread_config *next;
-  uint8_t status; //  XXX The location of this in struct affects if it works.... this is... wrong... hardcoded poop elsewhere?
+  uint8_t status;
+  uint8_t threadnum;
 } *pthread_config_ptr;
 
 
@@ -175,6 +176,8 @@ FILE *json_fd = NULL;
 FILE *fpdb_fd = NULL;
 struct fingerprint_new *search[8][4];
 char hostname[HOST_NAME_MAX];			/* store the hostname once to save multiple lookups */
+struct pthread_config *my_thread_config;
+
 
 /* These were in main, but this let's the signal handler close as needed */
 pcap_t *handle = NULL;						/* packet capture handle */

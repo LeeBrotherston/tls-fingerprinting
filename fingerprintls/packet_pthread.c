@@ -1,5 +1,4 @@
 void got_packet(u_char *args, struct pcap_pkthdr *pcap_header, u_char *packet) {
-		printf("Starting got_packet\n");
 		/* ************************************************************************* */
 		/* Variables, gotta have variables, and structs and pointers....  and things */
 		/* ************************************************************************* */
@@ -7,6 +6,8 @@ void got_packet(u_char *args, struct pcap_pkthdr *pcap_header, u_char *packet) {
 		extern FILE *json_fd;
 		extern int newsig_count;
 		extern char hostname[HOST_NAME_MAX];
+		extern pthread_mutex_t log_mutex;
+		extern pthread_mutex_t json_mutex;
 
 		int size_ip = 0;
 		int size_tcp;
@@ -126,8 +127,6 @@ void got_packet(u_char *args, struct pcap_pkthdr *pcap_header, u_char *packet) {
 				 if (show_drops)
 				 	fprintf(stderr, "[%s] Packet Drop: non-TCP made it though the filter... weird\n", printable_time);
 				return;
-			} else {
-				fprintf(stderr, "[%s] Packet passed TCP test: %i\n", printable_time, ipv4->ip_p);
 			}
 			break;
 
@@ -432,27 +431,31 @@ void got_packet(u_char *args, struct pcap_pkthdr *pcap_header, u_char *packet) {
 
 					/* Whole criteria match.... woo! */
 					matchcount++;
-					printf("[%s] Fingerprint Matched: \"%.*s\" %s connection from %s:%i to ", printable_time, fp_current->desc_length ,fp_current->desc, ssl_version(fp_current->tls_version),
+					if(pthread_mutex_lock(&log_mutex) != 0) {
+						printf("Output Mutex Locking Issue\n");
+					}
+					fprintf(stdout, "[%s] Fingerprint Matched: \"%.*s\" %s connection from %s:%i to ", printable_time, fp_current->desc_length ,fp_current->desc, ssl_version(fp_current->tls_version),
 						src_address_buffer, ntohs(tcp->th_sport));
-					printf("%s:%i ", dst_address_buffer, ntohs(tcp->th_dport));
-					printf("Servername: \"");
+					fprintf(stdout, "%s:%i ", dst_address_buffer, ntohs(tcp->th_dport));
+					fprintf(stdout, "Servername: \"");
 					if(packet_fp.server_name != NULL) {
 						for (arse = 7 ; arse <= (packet_fp.server_name[0]*256 + packet_fp.server_name[1]) + 1 ; arse++) {
 							if (packet_fp.server_name[arse] > 0x20 && packet_fp.server_name[arse] < 0x7b)
-								printf("%c", packet_fp.server_name[arse]);
+								fprintf(stdout, "%c", packet_fp.server_name[arse]);
 						}
 					} else {
-						printf("Not Set");
+						fprintf(stdout, "Not Set");
 					}
-					printf("\"");
+					fprintf(stdout, "\"");
 
 					if(matchcount > 1)
 						/* This shouldn't happen, but is useful to debug duplicate fingerprints */
 
 						/* May disable this for speed optimisation (or make it configurable) */
 
-						printf("(Multiple Match)");
-					printf("\n");
+						fprintf(stdout, "(Multiple Match)");
+					fprintf(stdout, "\n");
+					pthread_mutex_unlock(&log_mutex);
 
 			} else {
 					// Fuzzy Match goes here (if we ever want it)
@@ -529,6 +532,7 @@ void got_packet(u_char *args, struct pcap_pkthdr *pcap_header, u_char *packet) {
 			// Should just for json_fd being /dev/null and skip .. optimisation...
 			// or make an output function linked list XXX
 			snprintf(packet_fp.desc,sizeof(packet_fp.desc),"%s %s:%i -> %s:%i", fp_current->desc, src_address_buffer, ntohs(tcp->th_sport), dst_address_buffer, ntohs(tcp->th_dport));
+			pthread_mutex_lock(&json_mutex);
 			fprintf(json_fd, "{\"id\": %i, \"desc\": \"%s\", ", packet_fp.id, packet_fp.desc);
 			fprintf(json_fd, "\"record_tls_version\": \"0x%.04X\", ", packet_fp.record_tls_version);
 			fprintf(json_fd, "\"tls_version\": \"0x%.04X\", \"ciphersuite_length\": \"0x%.04X\", ",
@@ -626,7 +630,7 @@ void got_packet(u_char *args, struct pcap_pkthdr *pcap_header, u_char *packet) {
 
 
 			fprintf(json_fd, "}\n");
-
+			pthread_mutex_unlock(&json_mutex);
 			/* **************************** */
 			/* END OF RECORD - OR SOMETHING */
 			/* **************************** */

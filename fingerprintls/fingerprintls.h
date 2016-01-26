@@ -185,6 +185,7 @@ struct fingerprint_new *search[8][4];
 char hostname[HOST_NAME_MAX];			/* store the hostname once to save multiple lookups */
 struct pthread_config *my_thread_config;
 pthread_mutex_t log_mutex;
+pthread_mutex_t json_mutex;
 
 
 /* These were in main, but this let's the signal handler close as needed */

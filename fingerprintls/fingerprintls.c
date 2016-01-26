@@ -145,7 +145,6 @@ void packet_queue_handler(u_char *args, const struct pcap_pkthdr *pcap_header, c
 
 
 	for( ; ((pthread_mutex_trylock(&my_thread_config->mutex) != 0) && my_thread_config->status == 1) ;  my_thread_config = my_thread_config->next) {
-		printf("Debug: Thread #%i not ready - trying the next one\n", my_thread_config->threadnum);
 		// If needed a nanosleep here can be used to save thrashing the CPU looking for free threads
 	}
 
@@ -172,24 +171,18 @@ void *packet_pthread (void *thread_num) {
 	struct pthread_config *local_thread_config;
 
 	/* Get "my" config (as opposed to other threads) before doing anything else */
-	printf("Initialising thread #%i\n", (int) thread_num);
 	local_thread_config = pthread_config_ptr;
 	for(thread_counter = 0 ; thread_counter < (int) thread_num ; thread_counter++)
 		local_thread_config = local_thread_config->next;
 
 	/* For this test, we'll just while loop it */
 	while(1) {
-		printf("Loop thread #%i\n", (int) thread_num);
 
 		// Blocking mutex_lock should be enough to schedule readiness, but status is a double check because
 		// I believe there is a chance of a race condition, so it's an extra check without CPU intensive fun
 		if((pthread_mutex_lock(&local_thread_config->mutex) == 0) && local_thread_config->status == 1) {
-			printf("packet_pthread #%i\n", (int)  thread_num);
 			got_packet((u_char *) NULL, local_thread_config->pcap_header, local_thread_config->packet);
 			local_thread_config->status = 0;
-			//pthread_mutex_unlock(&local_thread_config->mutex);
-		//} else {
-		//	sleep(1);
 		}
 	}
 
@@ -498,6 +491,12 @@ int main(int argc, char **argv) {
 
 
 	/* OK, Checks are done, but we still need to set some stuff up before we go looping */
+
+	/* Before we setup pthreads, get all the mutexs setup */
+	extern pthread_mutex_t log_mutex;
+	extern pthread_mutex_t json_mutex;
+	pthread_mutex_init(&log_mutex, NULL);
+	pthread_mutex_init(&json_mutex, NULL);
 
 
 	/* Create pthread configs.  Doing this before spawning the threads in case it causes issues somehow */

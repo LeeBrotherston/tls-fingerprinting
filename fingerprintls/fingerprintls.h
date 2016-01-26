@@ -154,7 +154,14 @@ struct pthread_config {
   u_char *packet;
   struct pthread_config *next;
   uint8_t status;
+  // Status flag used in tandem with mutex for control of the struct.
+  // 0 - Empty and devoid of packets
+  // 1 - Thread to pickup packet
+  // 2 - Initialise
   uint8_t threadnum;
+  pthread_mutex_t mutex;
+  // Mutex is used to control when a thread takes a packet for processing
+  // unlocked sets it for use by the thread instead of polling
 } *pthread_config_ptr;
 
 

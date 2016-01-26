@@ -29,6 +29,11 @@ mistakes, kthnxbai.
 // XXX enhance search to include sorting per list/thread/shard/thingy
 // XXX add 6in4 support (should be as simple as UDP and IPv6... in theory)
 
+// XXX pthread mutex's TODO
+// 1 - Per thread queue
+// 2 - Updates to in memory database
+// 3 - Accesses to printf
+
 #include <pcap.h>
 #include <stdio.h>
 #include <string.h>
@@ -132,14 +137,22 @@ void packet_queue_handler(u_char *args, const struct pcap_pkthdr *pcap_header, c
 	//extern struct pthread_config *my_thread_config;
 
 	/* Copy things to new locations */
-	if(my_thread_config->status != 0) {
+	// If the thread mutex cannot be obtained it's processing a packet
+	// Check status flag to avoid a condition where there is no lock but thread is not ready for a new packet.
+	//while(my_thread_config->status != 0) {
+	//	printf("Oh noes, no status\n");
+	//}
+
+	if((pthread_mutex_trylock(&my_thread_config->mutex) != 0) && my_thread_config->status == 1) {
+		
 		printf("Thread not ready\n");
 		// XXX deal with here
 	} else {
-		printf("Say what: #%i\n", my_thread_config->threadnum);
+		// Got a lock (in the if), so yay it's free, let's compute...
 		memcpy(my_thread_config->pcap_header, pcap_header, sizeof(&pcap_header));
 		memcpy(my_thread_config->packet, packet, pcap_header->len);
 		my_thread_config->status = 1;  // Set flag for thread to pickup packet
+		pthread_mutex_unlock(&my_thread_config->mutex); // Mutex is unlocked, the thread will process.
 		/* Move the pointer on to the next thread ready for the next packet */
 		my_thread_config = my_thread_config->next;
 	}
@@ -162,12 +175,15 @@ void *packet_pthread (void *thread_num) {
 	while(1) {
 		printf("Loop thread #%i\n", (int) thread_num);
 
-		if(local_thread_config->status == 1) {
+		// Blocking mutex_lock should be enough to schedule readiness, but status is a double check because
+		// I believe there is a chance of a race condition, so it's an extra check without CPU intensive fun
+		if((pthread_mutex_lock(&local_thread_config->mutex) == 0) && local_thread_config->status == 1) {
 			printf("packet_pthread #%i\n", (int)  thread_num);
 			got_packet((u_char *) NULL, local_thread_config->pcap_header, local_thread_config->packet);
 			local_thread_config->status = 0;
-		} else {
-			sleep(1);
+			//pthread_mutex_unlock(&local_thread_config->mutex);
+		//} else {
+		//	sleep(1);
 		}
 	}
 
@@ -487,17 +503,21 @@ int main(int argc, char **argv) {
 		/* Will need to make the size of buffer configurable in future, sticking with 10 packets for now */
 		working_pthread_config->pcap_header = calloc(1, sizeof(struct pcap_pkthdr));
 		working_pthread_config->packet = calloc(1, SNAP_LEN);
-		working_pthread_config->status = 0;
+		working_pthread_config->status = 2;
 		working_pthread_config->threadnum = x; // Aids debugging if we can tell which thread did what
-
+		if(pthread_mutex_init(&working_pthread_config->mutex, NULL) != 0) {		// Setup mutex used for locking any one thread for packet queueing purposes
+			printf("Failed to setup pthread mutexs\n");
+			exit(0);
+		} else {
+			// Set the lock straight away so that the thread doesn't grab it before other things do
+			pthread_mutex_lock(&working_pthread_config->mutex);
+		}
 		if(x < (THREAD_COUNT-1)) {
-			printf("boom!\n");
 			//working_pthread_config->next = working_pthread_config + sizeof(struct pthread_config);
 			//working_pthread_config = working_pthread_config->next;
 			working_pthread_config->next = calloc(1, sizeof(struct pthread_config));
 			working_pthread_config = working_pthread_config->next;
 		} else {
-			printf("kablam!\n");
 			/* This is circular, so the packet quererer can just next, next, next, next the whole time
 			   This way it needs to knowledge of how many, etc.  Something else could add them in and out
 				 and reorder as necessary */

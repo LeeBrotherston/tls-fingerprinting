@@ -143,11 +143,17 @@ void packet_queue_handler(u_char *args, const struct pcap_pkthdr *pcap_header, c
 	//	printf("Oh noes, no status\n");
 	//}
 
-	if((pthread_mutex_trylock(&my_thread_config->mutex) != 0) && my_thread_config->status == 1) {
-		
-		printf("Thread not ready\n");
+
+	for( ; ((pthread_mutex_trylock(&my_thread_config->mutex) != 0) && my_thread_config->status == 1) ;  my_thread_config = my_thread_config->next) {
+		printf("Debug: Thread #%i not ready - trying the next one\n", my_thread_config->threadnum);
+		// If needed a nanosleep here can be used to save thrashing the CPU looking for free threads
+	}
+
+	//if((pthread_mutex_trylock(&my_thread_config->mutex) != 0) && my_thread_config->status == 1) {
+	//	printf("Debug: Thread #%i not ready\n", my_thread_config->threadnum);
+
 		// XXX deal with here
-	} else {
+	//} else {
 		// Got a lock (in the if), so yay it's free, let's compute...
 		memcpy(my_thread_config->pcap_header, pcap_header, sizeof(&pcap_header));
 		memcpy(my_thread_config->packet, packet, pcap_header->len);
@@ -155,7 +161,7 @@ void packet_queue_handler(u_char *args, const struct pcap_pkthdr *pcap_header, c
 		pthread_mutex_unlock(&my_thread_config->mutex); // Mutex is unlocked, the thread will process.
 		/* Move the pointer on to the next thread ready for the next packet */
 		my_thread_config = my_thread_config->next;
-	}
+	//}
 
 }
 

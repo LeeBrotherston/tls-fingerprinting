@@ -30,9 +30,9 @@ mistakes, kthnxbai.
 // XXX add 6in4 support (should be as simple as UDP and IPv6... in theory)
 
 // XXX pthread mutex's TODO
-// 1 - Per thread queue
-// 2 - Updates to in memory database
-// 3 - Accesses to printf
+// 1 - Per thread queue (done - testing)
+// 2 - Updates to in memory database - XXX NEEDS TO BE DONE!!
+// 3 - Accesses to printf (done - testing)
 
 #include <pcap.h>
 #include <stdio.h>
@@ -495,9 +495,11 @@ int main(int argc, char **argv) {
 	/* Before we setup pthreads, get all the mutexs setup */
 	extern pthread_mutex_t log_mutex;
 	extern pthread_mutex_t json_mutex;
+	extern pthread_mutex_t fpdb_mutex;
+
 	pthread_mutex_init(&log_mutex, NULL);
 	pthread_mutex_init(&json_mutex, NULL);
-
+	pthread_mutex_init(&fpdb_mutex, NULL);
 
 	/* Create pthread configs.  Doing this before spawning the threads in case it causes issues somehow */
 	struct pthread_config *working_pthread_config;
@@ -530,13 +532,6 @@ int main(int argc, char **argv) {
 		}
 		/* initialise the pthread mutex used for buffer management */
 		/* pthread_cond_init(working_pthread_config->queue_empty, NULL); */
-	}
-
-	printf("testing thread config structure...\n");
-	working_pthread_config = pthread_config_ptr;
-	for(x = 0; x < (THREAD_COUNT * 2); x++ ) {
-		printf("Test #%i\n", working_pthread_config->threadnum);
-		working_pthread_config = working_pthread_config->next;
 	}
 
 

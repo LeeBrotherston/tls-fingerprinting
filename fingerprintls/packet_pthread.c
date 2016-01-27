@@ -467,6 +467,13 @@ void got_packet(u_char *args, struct pcap_pkthdr *pcap_header, u_char *packet) {
 
 		if(matchcount == 0) {
 			newsig_count++;
+			if(pthread_mutex_lock(&log_mutex) != 0) {
+				printf("Output Mutex Locking Issue\n");
+			}
+			if(pthread_mutex_lock(&fpdb_mutex) != 0) {
+				printf("Output Mutex Locking Issue\n");
+			}
+			// XXX Check if lock blocked, and recheck for signature having been added if so?  Probably use "try" first
 
 			/* The fingerprint was not matched.  So let's just add it to the internal DB :) */
 			/* Allocate memory to store it */
@@ -512,6 +519,8 @@ void got_packet(u_char *args, struct pcap_pkthdr *pcap_header, u_char *packet) {
 				unarse += 2;
 				arse = arse + 4 + (packet_fp.extensions[(arse+2)]*256) + (packet_fp.extensions[arse+3]);
 			}
+			pthread_mutex_unlock(&fpdb_mutex);
+
 
 			/* If selected output in the normal stream */
 
@@ -528,6 +537,8 @@ void got_packet(u_char *args, struct pcap_pkthdr *pcap_header, u_char *packet) {
 				printf("Not Set");
 			}
 			printf("\"\n");
+			pthread_mutex_unlock(&log_mutex);
+
 
 			// Should just for json_fd being /dev/null and skip .. optimisation...
 			// or make an output function linked list XXX

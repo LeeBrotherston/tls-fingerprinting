@@ -186,6 +186,7 @@ char hostname[HOST_NAME_MAX];			/* store the hostname once to save multiple look
 struct pthread_config *my_thread_config;
 pthread_mutex_t log_mutex;
 pthread_mutex_t json_mutex;
+pthread_mutex_t fpdb_mutex;
 
 
 /* These were in main, but this let's the signal handler close as needed */

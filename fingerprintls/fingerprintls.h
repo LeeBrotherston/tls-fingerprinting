@@ -34,7 +34,7 @@ mistakes, kthnxbai.
 #define HOST_NAME_MAX 255
 
 /* Thread count (make this based on cores or something in future) */
-#define THREAD_COUNT 4
+#define THREAD_COUNT 8
 pthread_t threads[THREAD_COUNT];
 
 
@@ -187,6 +187,7 @@ struct pthread_config *my_thread_config;
 pthread_mutex_t log_mutex;
 pthread_mutex_t json_mutex;
 pthread_mutex_t fpdb_mutex;
+pthread_mutex_t pcap_mutex;
 
 
 /* These were in main, but this let's the signal handler close as needed */

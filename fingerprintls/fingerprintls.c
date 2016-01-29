@@ -131,6 +131,8 @@ void output() {
 /*
  * Queue packets into the appropriate buffer for the pthread that will handle it
  */
+
+ // XXX Currently not happening!
 void packet_queue_handler(u_char *args, const struct pcap_pkthdr *pcap_header, const u_char *packet) {
 
 	/* Quick and dirty, just throw the whole thing into a pthread */
@@ -164,11 +166,14 @@ void packet_queue_handler(u_char *args, const struct pcap_pkthdr *pcap_header, c
 
 }
 
+
 //  Need to work out local vs extern use of my_thread_config XXX ....  2 functions using it could cause thread issues
 
 void *packet_pthread (void *thread_num) {
 	int thread_counter;
 	struct pthread_config *local_thread_config;
+	extern pthread_mutex_t pcap_mutex;
+
 
 	/* Get "my" config (as opposed to other threads) before doing anything else */
 	local_thread_config = pthread_config_ptr;
@@ -177,12 +182,12 @@ void *packet_pthread (void *thread_num) {
 
 	/* For this test, we'll just while loop it */
 	while(1) {
+		/* mutex lock should block until available, at which point pcap_loop will block until packet */
+		/* all this blocking means no need to poll or sleep or anything... woo! */
+		if(pthread_mutex_lock(&pcap_mutex) == 0) {
+			/* When we got a lock, use pcap_loop for one whole packet */
+			pcap_loop(handle, 1, copy_packet, NULL);
 
-		// Blocking mutex_lock should be enough to schedule readiness, but status is a double check because
-		// I believe there is a chance of a race condition, so it's an extra check without CPU intensive fun
-		if((pthread_mutex_lock(&local_thread_config->mutex) == 0) && local_thread_config->status == 1) {
-			got_packet((u_char *) NULL, local_thread_config->pcap_header, local_thread_config->packet);
-			local_thread_config->status = 0;
 		}
 	}
 
@@ -496,10 +501,14 @@ int main(int argc, char **argv) {
 	extern pthread_mutex_t log_mutex;
 	extern pthread_mutex_t json_mutex;
 	extern pthread_mutex_t fpdb_mutex;
+	extern pthread_mutex_t pcap_mutex;
+
 
 	pthread_mutex_init(&log_mutex, NULL);
 	pthread_mutex_init(&json_mutex, NULL);
 	pthread_mutex_init(&fpdb_mutex, NULL);
+	pthread_mutex_init(&pcap_mutex, NULL);
+
 
 	/* Create pthread configs.  Doing this before spawning the threads in case it causes issues somehow */
 	struct pthread_config *working_pthread_config;
@@ -550,7 +559,11 @@ int main(int argc, char **argv) {
 
 
 	/* now we can set our callback function */
-	pcap_loop(handle, -1, packet_queue_handler, NULL);
+	//pcap_loop(handle, -1, packet_queue_handler, NULL);
+
+	// XXX Placeholder whilst testing
+	packet_pthread(THREAD_COUNT+1);
+
 
 	/* This only occurs with pcap, not live capture, need signal shiz XXX */
 

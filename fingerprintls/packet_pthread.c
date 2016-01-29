@@ -1,3 +1,30 @@
+void copy_packet(u_char *args, struct pcap_pkthdr *pcap_header, u_char *packet) {
+
+	struct pcap_pkthdr *pcap_header_copy;
+  u_char *packet_copy;
+
+	/* If this works assign once and use pointers */
+	pcap_header_copy = calloc(1, sizeof(struct pcap_pkthdr));
+	packet_copy = calloc(1, SNAP_LEN);
+
+	memcpy(pcap_header_copy, pcap_header, sizeof(&pcap_header));
+	memcpy(packet_copy, packet, pcap_header->len);
+
+	/*
+		We can do this because although a different function, this is the same thread that locked the pcap interface
+		This Frees up the next thread to grab a packet as we have already taken a copy and no longer need to refer
+		to the one provided by libpcap.
+	*/
+	pthread_mutex_unlock(&pcap_mutex);
+
+	/* Now we have copied the packet, we can process it whilst other threads do their thing */
+	got_packet((u_char *) NULL, pcap_header_copy, packet_copy);
+
+	free(pcap_header_copy);
+	free(packet_copy);
+}
+
+
 void got_packet(u_char *args, struct pcap_pkthdr *pcap_header, u_char *packet) {
 		/* ************************************************************************* */
 		/* Variables, gotta have variables, and structs and pointers....  and things */
@@ -8,6 +35,7 @@ void got_packet(u_char *args, struct pcap_pkthdr *pcap_header, u_char *packet) {
 		extern char hostname[HOST_NAME_MAX];
 		extern pthread_mutex_t log_mutex;
 		extern pthread_mutex_t json_mutex;
+		extern pthread_mutex_t pcap_mutex;
 
 		int size_ip = 0;
 		int size_tcp;
@@ -402,6 +430,11 @@ void got_packet(u_char *args, struct pcap_pkthdr *pcap_header, u_char *packet) {
 		/* New Matching thinger test */
 		/* ************************* */
 		//for(fp_current = fp_first ; fp_current != NULL; fp_current = fp_current->next) {
+
+		if(pthread_mutex_lock(&fpdb_mutex) != 0) {
+			printf("FPDB Mutex Locking Issue\n");
+		}
+
 		for(fp_current = search[((packet_fp.ciphersuite_length & 0x000F) >> 1 )][((packet_fp.tls_version) & 0x00FF)] ;
 			fp_current != NULL; fp_current = fp_current->next) {
 
@@ -470,9 +503,8 @@ void got_packet(u_char *args, struct pcap_pkthdr *pcap_header, u_char *packet) {
 			if(pthread_mutex_lock(&log_mutex) != 0) {
 				printf("Output Mutex Locking Issue\n");
 			}
-			if(pthread_mutex_lock(&fpdb_mutex) != 0) {
-				printf("Output Mutex Locking Issue\n");
-			}
+
+
 			// XXX Check if lock blocked, and recheck for signature having been added if so?  Probably use "try" first
 
 			/* The fingerprint was not matched.  So let's just add it to the internal DB :) */
@@ -481,9 +513,8 @@ void got_packet(u_char *args, struct pcap_pkthdr *pcap_header, u_char *packet) {
 			printf("[%s] New FingerPrint [%i] Detected, dynamically adding to in-memory fingerprint database\n", printable_time, newsig_count);
 			// XXX Should really check if malloc works ;)
 			fp_current = malloc(sizeof(struct fingerprint_new));
-			/* Update pointers, put top of list */
+			/* Update pointer for next to the top of list */
 			fp_current->next = search[((packet_fp.ciphersuite_length & 0x000F) >> 1 )][((packet_fp.tls_version) & 0x00FF)];
-			search[((packet_fp.ciphersuite_length & 0x000F) >> 1 )][((packet_fp.tls_version) & 0x00FF)] = fp_current;
 			/* Populate the fingerprint */
 			fp_current->fingerprint_id = 0;
 			fp_current->desc_length = strlen("Dynamic ") + strlen(hostname) + 7; // 7 should cover the max uint16_t + space
@@ -519,7 +550,9 @@ void got_packet(u_char *args, struct pcap_pkthdr *pcap_header, u_char *packet) {
 				unarse += 2;
 				arse = arse + 4 + (packet_fp.extensions[(arse+2)]*256) + (packet_fp.extensions[arse+3]);
 			}
-			pthread_mutex_unlock(&fpdb_mutex);
+
+			/* Finally, insert this into the list */
+			search[((packet_fp.ciphersuite_length & 0x000F) >> 1 )][((packet_fp.tls_version) & 0x00FF)] = fp_current;
 
 
 			/* If selected output in the normal stream */
@@ -645,5 +678,9 @@ void got_packet(u_char *args, struct pcap_pkthdr *pcap_header, u_char *packet) {
 			/* **************************** */
 			/* END OF RECORD - OR SOMETHING */
 			/* **************************** */
+		}
+
+		if(pthread_mutex_unlock(&fpdb_mutex) != 0) {
+			printf("FPDB Mutex unLocking Issue\n");
 		}
 }

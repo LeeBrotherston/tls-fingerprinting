@@ -201,4 +201,4 @@ int register_signals();
 void sig_handler (int signo);
 int extensions_compare(uint8_t *packet, uint8_t *fingerprint, int length, int count);
 void print_usage(char *bin_name);
-void got_packet(u_char *args, struct pcap_pkthdr *pcap_header, u_char *packet);
+void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_char *packet);

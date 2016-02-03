@@ -108,19 +108,19 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		struct tmp_fingerprint {
 			uint16_t 	id;
 			char 			desc[312];
-			uint16_t 	record_tls_version;
-			uint16_t 	tls_version;
-			uint16_t 	ciphersuite_length;
-			uint8_t		*ciphersuite;
-			uint8_t		compression_length;
-			uint8_t		*compression;
-			uint16_t 	extensions_length;
+//			uint16_t 	record_tls_version;
+//			uint16_t 	tls_version;
+//			uint16_t 	ciphersuite_length;
+//			uint8_t		*ciphersuite;
+//			uint8_t		compression_length;
+//			uint8_t		*compression;
+//			uint16_t 	extensions_length;
 			uint8_t		*extensions;
-			uint16_t	e_curves_length;
+//			uint16_t	e_curves_length;
 			uint8_t		*e_curves;
-			uint16_t 	sig_alg_length;
+//			uint16_t 	sig_alg_length;
 			uint8_t		*sig_alg;
-			uint16_t 	ec_point_fmt_length;
+//			uint16_t 	ec_point_fmt_length;
 			uint8_t		*ec_point_fmt;
 			char 			*server_name;
 			int				padding_length;
@@ -129,7 +129,10 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 
 
 		fp_temp = malloc(sizeof(struct fingerprint_new));
-
+		if(fp_temp == NULL) {
+			printf("Malloc Error\n");
+			exit(0);
+		}
 
 		/* ************************************* */
 		/* Anything we need from the pcap_pkthdr */
@@ -321,7 +324,6 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 			inet_ntop(af_type,(void*)&ipv6->ip6_dst,dst_address_buffer,sizeof(dst_address_buffer));
 		}
 
-
 		/* TLS Version (Record Layer - not proper proper) */
 		fp_temp->record_tls_version = (payload[1]*256) + payload[2];
 
@@ -331,7 +333,6 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		/* CipherSuite */
 		cipher_data += 1 + cipher_data[0];
 		u_short cs_len = cipher_data[0]*256 + cipher_data[1];
-
 		/* Length */
 		fp_temp->ciphersuite_length = (cipher_data[0]*256) + cipher_data[1];
 
@@ -340,8 +341,11 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		cipher_data += 2; // skip cipher suites length
 
 		fp_temp->ciphersuite = malloc(fp_temp->ciphersuite_length);
+		if(fp_temp->ciphersuite == NULL) {
+			printf("Malloc Error\n");
+			exit(0);
+		}
 		memcpy(fp_temp->ciphersuite, (uint8_t *)cipher_data, fp_temp->ciphersuite_length);
-
 		//packet_fp.ciphersuite = (uint8_t *)cipher_data;
 
 		/* Compression */
@@ -354,9 +358,12 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		cipher_data += cs_len + 1;
 
 		fp_temp->compression = malloc(fp_temp->compression_length);
+		if(fp_temp->compression == NULL) {
+			printf("Malloc Error\n");
+			exit(0);
+		}
 		memcpy(fp_temp->compression, (uint8_t *)cipher_data, fp_temp->compression_length);
 		//packet_fp.compression = (uint8_t *)cipher_data;
-
 		/* Extensions */
 		u_short ext_len = cipher_data[comp_len]*256 + cipher_data[comp_len+1];
 		int ext_id, ext_count = 0;
@@ -379,7 +386,6 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		if(cipher_data - payload > size_payload) {
 			ext_len = 0;
 		}
-
 		/* Loop through the extensions */
 		fp_temp->extensions_length = 0;
 		for (ext_id = 0; ext_id < ext_len ; ext_id++ ) {
@@ -443,7 +449,6 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 	//	int fp_loop, arse;
 
 
-
 		/* XXX This horrible kludge to get around the 2 length fields.  FIX IT! */
 		// XXX Check that curves are working (being matched, etc)
 		uint8_t *realcurves = packet_fp.e_curves;
@@ -475,7 +480,6 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		}
 		/* ******************************************************************** */
 
-
 		/*
 			This is only living here temporarily (XXX).  This is to test that this setup works in principle,
 			before merging into main it will need to be merged with above to remove duplication of work.
@@ -487,11 +491,15 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		*/
 		// XXX Should really check if malloc works ;)
 		/* Update pointer for next to the top of list */
-		//fp_temp->next = search[((fp_temp->ciphersuite_length & 0x000F) >> 1 )][((fp_temp->tls_version) & 0x00FF)];
+		fp_temp->next = search[((fp_temp->ciphersuite_length & 0x000F) >> 1 )][((fp_temp->tls_version) & 0x00FF)];
 		/* Populate the fingerprint */
 		fp_temp->fingerprint_id = 0;
 		fp_temp->desc_length = strlen("Dynamic ") + strlen(hostname) + 7; // 7 should cover the max uint16_t + space
 		fp_temp->desc = malloc(fp_temp->desc_length);
+		if(fp_temp->desc == NULL) {
+			printf("Malloc Error\n");
+			exit(0);
+		}
 		sprintf(fp_temp->desc, "Dynamic %s %d", hostname, newsig_count);
 		//fp_temp->record_tls_version = packet_fp.record_tls_version;
 		//fp_temp->tls_version = packet_fp.tls_version;
@@ -505,13 +513,31 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		//fp_temp->ciphersuite = malloc(fp_temp->ciphersuite_length);
 		//fp_temp->compression = malloc(fp_temp->compression_length);
 		fp_temp->extensions = malloc(fp_temp->extensions_length);
+		if(fp_temp->extensions == NULL) {
+			printf("Malloc Error\n");
+			exit(0);
+		}
 		//fp_temp->curves = malloc(fp_temp->curves_length);
 		fp_temp->sig_alg = malloc(fp_temp->sig_alg_length);
+		if(fp_temp->sig_alg == NULL) {
+			printf("Malloc Error\n");
+			exit(0);
+		}
 		fp_temp->ec_point_fmt = malloc(fp_temp->ec_point_fmt_length);
+		if(fp_temp->ec_point_fmt == NULL) {
+			printf("Malloc Error\n");
+			exit(0);
+		}
 		// Copy the data over (except extensions)
 		//memcpy(fp_temp->ciphersuite, packet_fp.ciphersuite, fp_temp->ciphersuite_length);
 		//memcpy(fp_temp->compression, packet_fp.compression, fp_temp->compression_length);
-		//memcpy(fp_temp->curves, realcurves, fp_temp->curves_length);
+		fp_temp->curves = malloc(fp_temp->curves_length);
+		if(fp_temp->curves == NULL) {
+			printf("Malloc Error\n");
+			exit(0);
+		}
+		memcpy(fp_temp->curves, realcurves, fp_temp->curves_length);
+
 		memcpy(fp_temp->sig_alg, realsig_alg, fp_temp->sig_alg_length);
 		memcpy(fp_temp->ec_point_fmt, realec_point_fmt, fp_temp->ec_point_fmt_length);
 
@@ -529,7 +555,6 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 			XXX End of temp stuff XXX
 			XXX End of temp stuff XXX
 		*/
-
 
 		/* ********************************************* */
 		/* The "compare to the fingerprint database" bit */
@@ -549,17 +574,17 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		for(fp_current = search[((fp_temp->ciphersuite_length & 0x000F) >> 1 )][((fp_temp->tls_version) & 0x00FF)] ;
 			fp_current != NULL; fp_current = fp_current->next) {
 
-
 			// XXX Need to optimise order and remove duplicate checks already used during indexing.
 			if ((fp_temp->record_tls_version == fp_current->record_tls_version) &&
 				(fp_temp->tls_version == fp_current->tls_version) &&
-
 				/* XXX extensions_length is misleading!  Length is variable, it is a count of
 				   uint8_t's that makes the extensions _list_.  Furthermore, these values are
 					 in pairs, so the count is actually half this....  Handle much more carefully
 					 kthnxbai */
-
 				/* Note: check lengths match first, the later comparisons assume these already match */
+
+				// XXX Crash when reading a new fingerprint as a recognised one
+
 				(fp_temp->ciphersuite_length == fp_current->ciphersuite_length) &&
 				(fp_temp->compression_length == fp_current->compression_length) &&
 				(fp_temp->extensions_length == fp_current->extensions_length) &&
@@ -573,7 +598,6 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 				!(bcmp(realcurves, fp_current->curves, fp_current->curves_length)) &&
 				!(bcmp(fp_temp->sig_alg, fp_current->sig_alg, fp_current->sig_alg_length)) &&
 				!(bcmp(fp_temp->ec_point_fmt, fp_current->ec_point_fmt, fp_current->ec_point_fmt_length))) {
-
 					/* Whole criteria match.... woo! */
 					matchcount++;
 					fprintf(stdout, "[%s] Fingerprint Matched: \"%.*s\" %s connection from %s:%i to ", printable_time, fp_current->desc_length ,fp_current->desc, ssl_version(fp_current->tls_version),
@@ -599,10 +623,9 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 					fprintf(stdout, "\n");
 			} else {
 				// Fuzzy Match goes here (if we ever want it)
-				printf("Test: %s\n", fp_current->desc);
-				printf("%X %X\n", fp_temp->curves_length, fp_current->curves_length);
 			}
 		}
+
 
 		/* ********************************************* */
 
@@ -738,6 +761,19 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 			/* **************************** */
 			/* END OF RECORD - OR SOMETHING */
 			/* **************************** */
+		} else {
+			/*
+				It is matched and so we do not need this memory allocation anymore.
+				Time to free to things
+			*/
+
+			free(fp_temp->ciphersuite);
+			free(fp_temp->compression);
+			free(fp_temp->desc);
+			free(fp_temp->extensions);
+			free(fp_temp->sig_alg);
+			free(fp_temp->ec_point_fmt);
+			free(fp_temp);
 		}
 
 }

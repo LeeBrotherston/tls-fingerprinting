@@ -2,7 +2,16 @@
  * Queue packets into the appropriate buffer for the pthread that will handle it
  */
 
- // XXX Currently not happening!
+// XXX as expected there is a memory leak, because I've been a bit yeeehaw with malloc in doing this test
+// check through the code to make sure mallocs and frees are all matched up. (may be fixed?)
+
+// XXX reuse alloc'd space
+
+// XXX Don't copy FP.  Add direct to DB (maybe realloc guesses?).  Alloc new space for next packet.
+
+// XXX Thread this mofo up
+
+// XXX Currently not happening!
 //void packet_queue_handler(u_char *args, const struct pcap_pkthdr *pcap_header, const u_char *packet) {
 //
 //	/* Quick and dirty, just throw the whole thing into a pthread */
@@ -34,37 +43,6 @@
 //		my_thread_config = my_thread_config->next;
 //	//}
 //
-//}
-
-//void copy_packet(u_char *args, struct pcap_pkthdr *pcap_header, u_char *packet) {
-//
-//	struct pcap_pkthdr *pcap_header_copy;
-//  u_char *packet_copy;
-//
-//	extern pthread_mutex_t log_mutex;
-//	extern pthread_mutex_t json_mutex;
-//	extern pthread_mutex_t pcap_mutex;
-//	extern pthread_mutex_t fpdb_mutex;
-//
-//	/* If this works assign once and use pointers */
-//	pcap_header_copy = calloc(1, sizeof(struct pcap_pkthdr));
-//	packet_copy = calloc(1, SNAP_LEN);
-//
-//	memcpy(pcap_header_copy, pcap_header, sizeof(&pcap_header));
-//	memcpy(packet_copy, packet, pcap_header->len);
-//
-//	/*
-//		We can do this because although a different function, this is the same thread that locked the pcap interface
-//		This Frees up the next thread to grab a packet as we have already taken a copy and no longer need to refer
-//		to the one provided by libpcap.
-//	*/
-//	pthread_mutex_unlock(&pcap_mutex);
-//
-//	/* Now we have copied the packet, we can process it whilst other threads do their thing */
-//	got_packet((u_char *) NULL, pcap_header_copy, packet_copy);
-//
-//	free(pcap_header_copy);
-//	free(packet_copy);
 //}
 
 
@@ -104,28 +82,30 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		struct tcp_header *tcp;           /* The TCP header */
 		u_char *payload;                  /* Packet payload */
 
+		char 			*server_name;						/* Server name per the extension */
+
 		/* Different to struct fingerprint in fpdb.h, this is for building new fingerprints */
-		struct tmp_fingerprint {
-			uint16_t 	id;
-			char 			desc[312];
+		//struct tmp_fingerprint {
+//			uint16_t 	id;
+//			char 			desc[312];
 //			uint16_t 	record_tls_version;
 //			uint16_t 	tls_version;
 //			uint16_t 	ciphersuite_length;
-//			uint8_t		*ciphersuite;
+//			uint8_t		* ciphersuite;
 //			uint8_t		compression_length;
-//			uint8_t		*compression;
+//			uint8_t		* compression;
 //			uint16_t 	extensions_length;
-			uint8_t		*extensions;
+//			uint8_t		*extensions;
 //			uint16_t	e_curves_length;
-			uint8_t		*e_curves;
+//			uint8_t		*e _curves;
 //			uint16_t 	sig_alg_length;
-			uint8_t		*sig_alg;
+//			uint8_t		* sig_alg;
 //			uint16_t 	ec_point_fmt_length;
-			uint8_t		*ec_point_fmt;
-			char 			*server_name;
-			int				padding_length;
-		} packet_fp;
-
+//			uint8_t		* ec_point_fmt;
+//			char 			* server_name;
+//			int				padding_length;
+//		} packet_fp;
+//  XXX successful decomission requires mallocing space for all pointers to point to
 
 
 		fp_temp = malloc(sizeof(struct fingerprint_new));
@@ -314,7 +294,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		/* ************************************************************************ */
 
 		/* ID and Desc (with defaults for unknown fingerprints) */
-		packet_fp.id = 0;
+		fp_temp->fingerprint_id = 0;
 		if (ip_version==4) {
 			inet_ntop(af_type,(void*)&ipv4->ip_src,src_address_buffer,sizeof(src_address_buffer));
 			inet_ntop(af_type,(void*)&ipv4->ip_dst,dst_address_buffer,sizeof(dst_address_buffer));
@@ -371,14 +351,14 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		/* Length */
 		cipher_data += comp_len + 2;
 
-		packet_fp.e_curves = NULL;
-		packet_fp.sig_alg = NULL;
-		packet_fp.ec_point_fmt = NULL;
-		packet_fp.server_name = NULL;
+		fp_temp->curves = NULL;
+		fp_temp->sig_alg = NULL;
+		fp_temp->ec_point_fmt = NULL;
+		server_name = NULL;
 
 
 		/* So this works - so overall length seems ok */
-		packet_fp.extensions = (uint8_t *)cipher_data;
+		uint8_t *extensions_tmp_ptr = (uint8_t *)cipher_data;
 
 		/* If we are at the end of the packet we have no extensions, without this
 			 we will just run off the end of the packet into unallocated space :/
@@ -399,19 +379,20 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 			switch(ext_type) {
 				case 0x000a:
 					/* elliptic_curves */
-					packet_fp.e_curves = (uint8_t *)&cipher_data[ext_id + 2];
+					fp_temp->curves = (uint8_t *)&cipher_data[ext_id + 2];
 					/* 2 & 3, not 0 & 1 because of 2nd length field */
-					fp_temp->curves_length = packet_fp.e_curves[2]*256 + packet_fp.e_curves[3];
+					fp_temp->curves_length = fp_temp->curves[2]*256 + fp_temp->curves[3];
 					break;
 				case 0x000b:
 					/* ec_point formats */
-					packet_fp.ec_point_fmt = (uint8_t *)&cipher_data[ext_id + 2];
-					fp_temp->ec_point_fmt_length = packet_fp.ec_point_fmt[2];
+					fp_temp->ec_point_fmt = (uint8_t *)&cipher_data[ext_id + 2];
+					fp_temp->ec_point_fmt_length = fp_temp->ec_point_fmt[2];
+					//printf("ec point length: %i\n", fp_temp->ec_point_fmt_length);
 					break;
 				case 0x000d:
 					/* Signature algorithms */
-					packet_fp.sig_alg = (uint8_t *)&cipher_data[ext_id + 2];
-					fp_temp->sig_alg_length = packet_fp.sig_alg[2]*256 + packet_fp.sig_alg[3];
+					fp_temp->sig_alg = (uint8_t *)&cipher_data[ext_id + 2];
+					fp_temp->sig_alg_length = fp_temp->sig_alg[2]*256 + fp_temp->sig_alg[3];
 					break;
 				case 0x0000:
 					/* Definitely *NOT* signature-worthy
@@ -419,7 +400,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 					 * of packets during signature creation.
 					 */
 					/* Server Name */
-					packet_fp.server_name = (char *)&cipher_data[ext_id+2];
+					server_name = (char *)&cipher_data[ext_id+2];
 					break;
 
 				/* Some potential new extenstions to exploit for fingerprint material */
@@ -451,8 +432,8 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 
 		/* XXX This horrible kludge to get around the 2 length fields.  FIX IT! */
 		// XXX Check that curves are working (being matched, etc)
-		uint8_t *realcurves = packet_fp.e_curves;
-		if (packet_fp.e_curves != NULL) {
+		uint8_t *realcurves = fp_temp->curves;
+		if (fp_temp->curves != NULL) {
 			realcurves += 4;
 		} else {
 			realcurves = NULL;
@@ -461,8 +442,8 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 			/* ******************************************************************** */
 
 		/* XXX This horrible kludge to get around the 2 length fields.  FIX IT! */
-		uint8_t *realsig_alg = packet_fp.sig_alg;
-			if(packet_fp.sig_alg != NULL) {
+		uint8_t *realsig_alg = fp_temp->sig_alg;
+			if(fp_temp->sig_alg != NULL) {
 			realsig_alg += 4;
 		} else {
 			realsig_alg = NULL;
@@ -471,8 +452,8 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		/* ******************************************************************** */
 
 		/* XXX This horrible kludge to get around the 2 length fields.  FIX IT! */
-		uint8_t *realec_point_fmt = packet_fp.ec_point_fmt;
-		if(packet_fp.ec_point_fmt != NULL) {
+		uint8_t *realec_point_fmt = fp_temp->ec_point_fmt;
+		if(fp_temp->ec_point_fmt != NULL) {
 			realec_point_fmt += 3;
 		} else {
 			realec_point_fmt = NULL;
@@ -480,15 +461,6 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		}
 		/* ******************************************************************** */
 
-		/*
-			This is only living here temporarily (XXX).  This is to test that this setup works in principle,
-			before merging into main it will need to be merged with above to remove duplication of work.
-
-			We will create a fingerprint upfront, create a new thread, that will match new against DB then either
-			call free (or reuse) or shuffle pointers to place it in the database.
-
-			Other changes will happen, like switching malloc for calloc, checking the calloc call, etc
-		*/
 		// XXX Should really check if malloc works ;)
 		/* Update pointer for next to the top of list */
 		fp_temp->next = search[((fp_temp->ciphersuite_length & 0x000F) >> 1 )][((fp_temp->tls_version) & 0x00FF)];
@@ -537,24 +509,17 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 			exit(0);
 		}
 		memcpy(fp_temp->curves, realcurves, fp_temp->curves_length);
-
 		memcpy(fp_temp->sig_alg, realsig_alg, fp_temp->sig_alg_length);
 		memcpy(fp_temp->ec_point_fmt, realec_point_fmt, fp_temp->ec_point_fmt_length);
 
 		// Load up the extensions
 		int unarse = 0;
 		for (arse = 0 ; arse < ext_len ;) {
-			fp_temp->extensions[unarse] = (uint8_t) packet_fp.extensions[arse];
-			fp_temp->extensions[unarse+1] = (uint8_t) packet_fp.extensions[arse+1];
+			fp_temp->extensions[unarse] = (uint8_t) extensions_tmp_ptr[arse];
+			fp_temp->extensions[unarse+1] = (uint8_t) extensions_tmp_ptr[arse+1];
 			unarse += 2;
-			arse = arse + 4 + (packet_fp.extensions[(arse+2)]*256) + (packet_fp.extensions[arse+3]);
+			arse = arse + 4 + (uint8_t)(extensions_tmp_ptr[(arse+2)]*256) + (uint8_t)(extensions_tmp_ptr[arse+3]);
 		}
-
-		/*
-			XXX End of temp stuff XXX
-			XXX End of temp stuff XXX
-			XXX End of temp stuff XXX
-		*/
 
 		/* ********************************************* */
 		/* The "compare to the fingerprint database" bit */
@@ -604,10 +569,10 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 						src_address_buffer, ntohs(tcp->th_sport));
 					fprintf(stdout, "%s:%i ", dst_address_buffer, ntohs(tcp->th_dport));
 					fprintf(stdout, "Servername: \"");
-					if(packet_fp.server_name != NULL) {
-						for (arse = 7 ; arse <= (packet_fp.server_name[0]*256 + packet_fp.server_name[1]) + 1 ; arse++) {
-							if (packet_fp.server_name[arse] > 0x20 && packet_fp.server_name[arse] < 0x7b)
-								fprintf(stdout, "%c", packet_fp.server_name[arse]);
+					if(server_name != NULL) {
+						for (arse = 7 ; arse <= (server_name[0]*256 + server_name[1]) + 1 ; arse++) {
+							if (server_name[arse] > 0x20 && server_name[arse] < 0x7b)
+								fprintf(stdout, "%c", server_name[arse]);
 						}
 					} else {
 						fprintf(stdout, "Not Set");
@@ -648,10 +613,10 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 				src_address_buffer, ntohs(tcp->th_sport));
 			printf("%s:%i ", dst_address_buffer, ntohs(tcp->th_dport));
 			printf("Servername: \"");
-			if(packet_fp.server_name != NULL) {
-				for (arse = 7 ; arse <= (packet_fp.server_name[0]*256 + packet_fp.server_name[1]) + 1 ; arse++) {
-					if (packet_fp.server_name[arse] > 0x20 && packet_fp.server_name[arse] < 0x7b)
-						printf("%c", packet_fp.server_name[arse]);
+			if(server_name != NULL) {
+				for (arse = 7 ; arse <= (server_name[0]*256 + server_name[1]) + 1 ; arse++) {
+					if (server_name[arse] > 0x20 && server_name[arse] < 0x7b)
+						printf("%c", server_name[arse]);
 				}
 			} else {
 				printf("Not Set");
@@ -661,8 +626,11 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 
 			// Should just for json_fd being /dev/null and skip .. optimisation...
 			// or make an output function linked list XXX
-			snprintf(packet_fp.desc,sizeof(packet_fp.desc),"%s %s:%i -> %s:%i", fp_current->desc, src_address_buffer, ntohs(tcp->th_sport), dst_address_buffer, ntohs(tcp->th_dport));
-			fprintf(json_fd, "{\"id\": %i, \"desc\": \"%s\", ", packet_fp.id, packet_fp.desc);
+			//snprintf(fp_temp->desc,sizeof(fp_temp->desc),"%s %s:%i -> %s:%i", fp_current->desc, src_address_buffer, ntohs(tcp->th_sport), dst_address_buffer, ntohs(tcp->th_dport));
+			//snprintf(fp_temp->desc, 312, "%s %s:%i -> %s:%i", fp_current->desc, src_address_buffer, ntohs(tcp->th_sport), dst_address_buffer, ntohs(tcp->th_dport));
+			//fprintf(json_fd, "{\"id\": %i, \"desc\": \"%s\", ", fp_temp->fingerprint_id, fp_temp->desc);
+			fprintf(json_fd, "{\"id\": %i, \"desc\": \"", fp_temp->fingerprint_id);
+			fprintf(json_fd, "%s\", ", fp_temp->desc);
 			fprintf(json_fd, "\"record_tls_version\": \"0x%.04X\", ", fp_temp->record_tls_version);
 			fprintf(json_fd, "\"tls_version\": \"0x%.04X\", \"ciphersuite_length\": \"0x%.04X\", ",
 				fp_temp->tls_version, fp_temp->ciphersuite_length);
@@ -697,60 +665,62 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 
 
 			fprintf(json_fd, "\"extensions\": \"");
-			for (arse = 0 ; arse < ext_len ;) {
-				fprintf(json_fd, "0x%.02X%.02X", (uint8_t) packet_fp.extensions[arse], (uint8_t) packet_fp.extensions[arse+1]);
-				arse = arse + 4 + (packet_fp.extensions[(arse+2)]*256) + (packet_fp.extensions[arse+3]);
+			for (arse = 0 ; arse < fp_temp->extensions_length ;) {
+				fprintf(json_fd, "0x%.02X%.02X", (uint8_t) fp_temp->extensions[arse], (uint8_t) fp_temp->extensions[arse+1]);
+				arse = arse + 2;
 				if(arse < ext_len -1)
 					fprintf(json_fd, " ");
 			}
 			fprintf(json_fd, "\"");
 
-			if(packet_fp.e_curves != NULL) {
+			if(fp_temp->curves != NULL) {
 				fprintf(json_fd, ", \"e_curves\": \"");
 
-				for (arse = 4 ; arse <= (packet_fp.e_curves[0]*256 + packet_fp.e_curves[1]) &&
-					(packet_fp.e_curves[0]*256 + packet_fp.e_curves[1]) > 4 ; arse = arse + 2) {
+				for (arse = 0 ; arse < fp_temp->curves_length &&
+					fp_temp->curves_length > 0 ; arse = arse + 2) {
 
-					fprintf(json_fd, "0x%.2X%.2X", packet_fp.e_curves[arse], packet_fp.e_curves[arse+1]);
-					if ((arse + 1) < (packet_fp.e_curves[0]*256 + packet_fp.e_curves[1])) {
+					fprintf(json_fd, "0x%.2X%.2X", fp_temp->curves[arse], fp_temp->curves[arse+1]);
+					if ((arse + 1) < fp_temp->curves_length) {
 						fprintf(json_fd, " ");
 					}
 				}
 				fprintf(json_fd, "\"");
 			}
 
-			if(packet_fp.sig_alg != NULL) {
+			if(fp_temp->sig_alg != NULL) {
 				fprintf(json_fd, ", \"sig_alg\": \"");
 
-				for (arse = 4 ; arse <= (packet_fp.sig_alg[0]*256 + packet_fp.sig_alg[1]) &&
-					(packet_fp.sig_alg[0]*256 + packet_fp.sig_alg[1]) > 4 ; arse = arse + 2) {
+//				for (arse = 4 ; arse <= (fp_temp->sig_alg[0]*256 + fp_temp->sig_alg[1]) &&
+//					(fp_temp->sig_alg[0]*256 + fp_temp->sig_alg[1]) > 4 ; arse = arse + 2) {
+				for (arse = 0 ; arse < (fp_temp->sig_alg_length) &&
+					fp_temp->sig_alg_length > 0 ; arse = arse + 2) {
 
-					fprintf(json_fd, "0x%.2X%.2X", packet_fp.sig_alg[arse], packet_fp.sig_alg[arse+1]);
-					if ((arse + 1) < (packet_fp.sig_alg[0]*256 + packet_fp.sig_alg[1])) {
+					fprintf(json_fd, "0x%.2X%.2X", fp_temp->sig_alg[arse], fp_temp->sig_alg[arse+1]);
+					if ((arse + 1) < (fp_temp->sig_alg_length)) {
 						fprintf(json_fd, " ");
 					}
 				}
 				fprintf(json_fd, "\"");
 			}
 
-			if(packet_fp.ec_point_fmt != NULL) {
+			if(fp_temp->ec_point_fmt != NULL) {
 				fprintf(json_fd, ", \"ec_point_fmt\": \"");
 
 				// Jumping to "3" to get past the second length parameter... errrr... why?
-				for (arse = 3 ; arse <= (packet_fp.ec_point_fmt[0]*256 + packet_fp.ec_point_fmt[1]) + 1 ; arse++) {
-					fprintf(json_fd, "0x%.2X", packet_fp.ec_point_fmt[arse]);
-					if ((arse + 1) < (packet_fp.ec_point_fmt[0]*256 + packet_fp.ec_point_fmt[1]) + 2) {
+				for (arse = 0 ; arse < fp_temp->ec_point_fmt_length; arse++) {
+					fprintf(json_fd, "0x%.2X", fp_temp->ec_point_fmt[arse]);
+					if ((arse + 1) < fp_temp->ec_point_fmt_length) {
 						fprintf(json_fd, " ");
 					}
 				}
 				fprintf(json_fd, "\"");
 			}
 
-			if(packet_fp.server_name != NULL) {
+			if(server_name != NULL) {
 				fprintf(json_fd, ", \"server_name\": \"");
-				for (arse = 7 ; arse <= (packet_fp.server_name[0]*256 + packet_fp.server_name[1]) + 1 ; arse++) {
-					if (packet_fp.server_name[arse] > 0x20 && packet_fp.server_name[arse] < 0x7b)
-						fprintf(json_fd, "%c", packet_fp.server_name[arse]);
+				for (arse = 7 ; arse <= (server_name[0]*256 + server_name[1]) + 1 ; arse++) {
+					if (server_name[arse] > 0x20 && server_name[arse] < 0x7b)
+						fprintf(json_fd, "%c", server_name[arse]);
 					else
 						fprintf(json_fd, "*");
 				}
@@ -773,6 +743,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 			free(fp_temp->extensions);
 			free(fp_temp->sig_alg);
 			free(fp_temp->ec_point_fmt);
+			free(fp_temp->curves);
 			free(fp_temp);
 		}
 

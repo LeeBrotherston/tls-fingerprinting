@@ -29,10 +29,7 @@ mistakes, kthnxbai.
 // XXX enhance search to include sorting per list/thread/shard/thingy
 // XXX add 6in4 support (should be as simple as UDP and IPv6... in theory)
 
-// XXX pthread mutex's TODO
-// 1 - Per thread queue (done - testing)
-// 2 - Updates to in memory database - XXX NEEDS TO BE DONE!!
-// 3 - Accesses to printf (done - testing)
+
 
 #include <pcap.h>
 #include <stdio.h>
@@ -54,9 +51,6 @@ mistakes, kthnxbai.
 /* For the signal handler stuff */
 #include <signal.h>
 
-/* Trying some POSIX Threads */
-#include <pthread.h>
-
 /* And my own signal handler functions */
 #include "signal.c"
 
@@ -64,45 +58,7 @@ mistakes, kthnxbai.
 #include "fingerprintls.h"
 
 /* Stuff to process packets */
-#include "packet_pthread.c"
-
-/* Compare extensions in packet *packet with fingerprint *fingerprint */
-//int extensions_compare(uint8_t *packet, uint8_t *fingerprint, int length, int count) {
-//	/* XXX check that all things passed to this _are_ uint8_t and we're not only partially checking stuff that may be longer!!!! */
-//	/*
-//		Return values are:
-//		0 - No match
-//		1 - Exact match
-//		2 - Fuzzy match
-//	*/
-//	int x = 0;
-//	int y = 0;
-//	int retval = 1;
-//	for (; x < length ;) {
-//		if (((uint8_t) packet[x] != fingerprint[y] ) || ((uint8_t) packet[x+1] != fingerprint[y+1])) {
-//			/* Perform a fuzzy search on "optional" extensions here */
-//			/*
-//
-//			Experimenting with fuzzy matches as certain extensions can vary with one client (looking at you Chrome!)
-//			0x7550 - "TLS Channel ID" - https://tools.ietf.org/html/draft-balfanz-tls-channelid-01.  Used for binding authentication tokens, extensions_compare
-//			0x0015 - "Padding" - Can totally discard this, because padding.
-//			0x0010 - "Application-Layer Protocol Negotiation" - https://tools.ietf.org/html/rfc7301
-//
-//			switch() {
-//				case 0x7550:
-//				case 0x0015:
-//				case 0x0010:
-//			}
-//			*/
-//			retval = 0;
-//			break;
-//		} else {
-//			y += 2;
-//			x = x + 4 + (packet[(x+2)]*256) + (packet[x+3]);
-//		}
-//	}
-//	return retval;
-//}
+#include "packet_processing.c"
 
 
 /*
@@ -125,43 +81,6 @@ void print_usage(char *bin_name) {
 }
 
 
-//  Need to work out local vs extern use of my_thread_config XXX ....  2 functions using it could cause thread issues
-
-//void *packet_pthread (void *thread_num) {
-//	int thread_counter;
-//	struct pthread_config *local_thread_config;
-//	extern pthread_mutex_t pcap_mutex;
-//
-//
-//	/* Get "my" config (as opposed to other threads) before doing anything else */
-//	local_thread_config = pthread_config_ptr;
-//	for(thread_counter = 0 ; thread_counter < (int) thread_num ; thread_counter++)
-//		local_thread_config = local_thread_config->next;
-//
-//	/* For this test, we'll just while loop it */
-//	while(1) {
-//		/* mutex lock should block until available, at which point pcap_loop will block until packet */
-//		/* all this blocking means no need to poll or sleep or anything... woo! */
-//		if(pthread_mutex_lock(&pcap_mutex) == 0) {
-//			/* When we got a lock, use pcap_loop for one whole packet */
-//			pcap_loop(handle, 1, copy_packet, NULL);
-//		} else {
-//			// Something went wrong here
-//			fprintf(stderr, "Mutex Issue, Throttleing\n");
-//			sleep(1);
-//		}
-//	}
-//
-//	/* Exit the pthread */
-//	//pthread_exit(NULL);
-//
-//}
-
-
-
-
-
-
 int main(int argc, char **argv) {
 
 	char *dev = NULL;					/* capture device name */
@@ -180,10 +99,6 @@ int main(int argc, char **argv) {
 	extern int show_drops;
 	extern char hostname[HOST_NAME_MAX];
 	show_drops = 0;
-
-//	/* pthreads */
-//	extern pthread_t threads[THREAD_COUNT];
-//	long pt;
 
 
 	/* Make sure pipe sees new packets unbuffered. */
@@ -455,76 +370,15 @@ int main(int argc, char **argv) {
 		exit(EXIT_FAILURE);
 	}
 
-
-	/* OK, Checks are done, but we still need to set some stuff up before we go looping */
-
-	/* Before we setup pthreads, get all the mutexs setup */
-//	extern pthread_mutex_t log_mutex;
-//	extern pthread_mutex_t json_mutex;
-//	extern pthread_mutex_t fpdb_mutex;
-//	extern pthread_mutex_t pcap_mutex;
-
-
-//	pthread_mutex_init(&log_mutex, NULL);
-//	pthread_mutex_init(&json_mutex, NULL);
-//	pthread_mutex_init(&fpdb_mutex, NULL);
-//	pthread_mutex_init(&pcap_mutex, NULL);
-
-
-	/* Create pthread configs.  Doing this before spawning the threads in case it causes issues somehow */
-//	struct pthread_config *working_pthread_config;
-//	extern struct pthread_config *next_thread_config;
-//	my_thread_config = working_pthread_config = pthread_config_ptr = calloc(1, sizeof(struct pthread_config));
-//	for(x = 0; x < THREAD_COUNT; x++) {
-//		printf("setting up thread config #%i\n", x);
-//		/* Will need to make the size of buffer configurable in future, sticking with 10 packets for now */
-//		working_pthread_config->pcap_header = calloc(1, sizeof(struct pcap_pkthdr));
-//		working_pthread_config->packet = calloc(1, SNAP_LEN);
-//		working_pthread_config->status = 2;
-//		working_pthread_config->threadnum = x; // Aids debugging if we can tell which thread did what
-//		if(pthread_mutex_init(&working_pthread_config->mutex, NULL) != 0) {		// Setup mutex used for locking any one thread for packet queueing purposes
-//			printf("Failed to setup pthread mutexs\n");
-//			exit(0);
-//		} else {
-//			// Set the lock straight away so that the thread doesn't grab it before other things do
-//			pthread_mutex_lock(&working_pthread_config->mutex);
-//		}
-//		if(x < (THREAD_COUNT-1)) {
-//			//working_pthread_config->next = working_pthread_config + sizeof(struct pthread_config);
-//			//working_pthread_config = working_pthread_config->next;
-//			working_pthread_config->next = calloc(1, sizeof(struct pthread_config));
-//			working_pthread_config = working_pthread_config->next;
-//		} else {
-//			/* This is circular, so the packet quererer can just next, next, next, next the whole time
-//			   This way it needs to knowledge of how many, etc.  Something else could add them in and out
-//				 and reorder as necessary */
-//			working_pthread_config->next = pthread_config_ptr;
-//		}
-//		/* initialise the pthread mutex used for buffer management */
-//		/* pthread_cond_init(working_pthread_config->queue_empty, NULL); */
-//	}
-
-
-//	/* Create the threads, with their thread id thing */
-//	/* This way they are started before the packets start arriving in the buffer */
-//	for(x = 0; x < THREAD_COUNT; x++) {
-//		pt = pthread_create(&threads[x], NULL, packet_pthread, (void *)x);
-//		printf("pthread_create %i\n", x);
-//	}
-
-
 	/* setup hostname variable for use in logs (incase of multiple hosts) */
 	if(gethostname(hostname, HOST_NAME_MAX) != 0) {
 		sprintf(hostname, "unknown");
 	}
 
-
 	/* now we can set our callback function */
 	pcap_loop(handle, -1, got_packet, NULL);
 
-
-	fprintf(stderr, "This shouldn't happen!..... CHICKEN!!\n");
-	/* This only occurs with pcap, not live capture, need signal shiz XXX */
+	fprintf(stderr, "Reached end of pcap\n");
 
 	/* cleanup */
 	pcap_freecode(&fp);

@@ -75,7 +75,6 @@ void print_usage(char *bin_name) {
 	fprintf(stderr, "    -d                Show reasons for discarded packets (post BPF)\n");
 	fprintf(stderr, "    -f <fpdb>         Load the (binary) FingerPrint Database\n");
 	fprintf(stderr, "    -u <uid>          Drop privileges to specified UID (not username)\n");
-//	fprintf(stderr, "    -t <count>        How many worker threads to use\n");
 	fprintf(stderr, "\n");
 	return;
 }

@@ -87,10 +87,10 @@ uint shard_fp (struct fingerprint_new *fp_lookup, uint16_t maxshard) {
 
 int main(int argc, char **argv) {
 
-	char *dev = NULL;					/* capture device name */
-	char *unpriv_user = NULL;					/* User for dropping privs */
+	char *dev = NULL;											/* capture device name */
+	char *unpriv_user = NULL;							/* User for dropping privs */
 	char errbuf[PCAP_ERRBUF_SIZE];				/* error buffer */
-	extern pcap_t *handle;						/* packet capture handle */
+	extern pcap_t *handle;								/* packet capture handle */
 
 	char *filter_exp = default_filter;
 	int arg_start = 1, i;
@@ -329,6 +329,7 @@ int main(int argc, char **argv) {
 		fp_current->next = search[((fp_current->ciphersuite_length & 0x000F) >> 1 )][((fp_current->tls_version) & 0x00FF)];
 		search[((fp_current->ciphersuite_length & 0x000F) >> 1 )][((fp_current->tls_version) & 0x00FF)] = fp_current;
 	}
+
 	printf("Loaded %i signatures\n", fp_count);
 
 	/* XXX END TESTING OF BINARY RULES */

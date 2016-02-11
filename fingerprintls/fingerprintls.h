@@ -33,9 +33,7 @@ mistakes, kthnxbai.
 /* Max hostname length */
 #define HOST_NAME_MAX 255
 
-/* Thread count (make this based on cores or something in future) */
-#define THREAD_COUNT 8
-pthread_t threads[THREAD_COUNT];
+#define FPSHARD 32
 
 
 /* Ethernet addresses are 6 bytes */

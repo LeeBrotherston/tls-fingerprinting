@@ -1,7 +1,7 @@
 # Commented this out for now, not sure how many use klang
 #CC=g++
 CFLAGS=-Wall -pedantic -Os
-LDFLAGS=-lpcap -lpthread
+LDFLAGS=-lpcap
 
 all: fingerprintls
 

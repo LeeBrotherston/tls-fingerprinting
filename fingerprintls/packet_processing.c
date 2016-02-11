@@ -9,6 +9,7 @@ uint shardnum (uint16_t port1, uint16_t port2, uint16_t maxshard) {
 }
 
 
+
 void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_char *packet) {
 		/* ************************************************************************* */
 		/* Variables, gotta have variables, and structs and pointers....  and things */
@@ -477,6 +478,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 				!(bcmp(realcurves, fp_nav->curves, fp_nav->curves_length)) &&
 				!(bcmp(realsig_alg, fp_nav->sig_alg, fp_nav->sig_alg_length)) &&
 				!(bcmp(realec_point_fmt, fp_nav->ec_point_fmt, fp_nav->ec_point_fmt_length))) {
+
 					/* Whole criteria match.... woo! */
 					matchcount++;
 					fprintf(stdout, "[%s] Fingerprint Matched: \"%.*s\" %s connection from %s:%i to ", printable_time, fp_nav->desc_length ,fp_nav->desc, ssl_version(fp_nav->tls_version),
@@ -502,9 +504,10 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 					fprintf(stdout, "\n");
 			} else {
 				// Fuzzy Match goes here (if we ever want it)
-			}
-		}
 
+			}
+
+		}
 
 		/* ********************************************* */
 
@@ -517,10 +520,12 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 
 			/* Update pointer for next to the top of list */
 			fp_packet->next = search[((fp_packet->ciphersuite_length & 0x000F) >> 1 )][((fp_packet->tls_version) & 0x00FF)];
+
 			/* Populate the fingerprint */
 			fp_packet->fingerprint_id = 0;
 			fp_packet->desc_length = strlen("Dynamic ") + strlen(hostname) + 7; // 7 should cover the max uint16_t + space
 			fp_packet->desc = malloc(fp_packet->desc_length);
+
 			if(fp_packet->desc == NULL) {
 				printf("Malloc Error (desc)\n");
 				exit(0);
@@ -574,7 +579,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 			/*
 				Insert fingerprint as first in it's "list"
 			*/
-			search[((fp_packet->ciphersuite_length & 0x000F) >> 1 )][((fp_packet->tls_version) & 0x00FF)] = fp_nav;
+			search[((fp_packet->ciphersuite_length & 0x000F) >> 1 )][((fp_packet->tls_version) & 0x00FF)] = fp_packet;
 
 
 			/* If selected output in the normal stream */

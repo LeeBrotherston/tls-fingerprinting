@@ -80,6 +80,10 @@ void print_usage(char *bin_name) {
 	return;
 }
 
+/* Testing another way of searching the in memory database */
+uint shard_fp (struct fingerprint_new *fp_lookup, uint16_t maxshard) {
+				return (((fp_lookup->ciphersuite_length) + (fp_lookup->tls_version)) & (maxshard -1));
+}
 
 int main(int argc, char **argv) {
 
@@ -322,19 +326,12 @@ int main(int argc, char **argv) {
 
 		/* Multi-array of pointers to appropriate (smaller) list */
 		/* XXX This should still be ordered for faster search */
-		if(search[((fp_current->ciphersuite_length & 0x000F) >> 1 )][((fp_current->tls_version) & 0x00FF)] == NULL) {
-			search[((fp_current->ciphersuite_length & 0x000F) >> 1 )][((fp_current->tls_version) & 0x00FF)] = fp_current;
-		} else {
-			fp_current->next = search[((fp_current->ciphersuite_length & 0x000F) >> 1 )][((fp_current->tls_version) & 0x00FF)];
-			search[((fp_current->ciphersuite_length & 0x000F) >> 1 )][((fp_current->tls_version) & 0x00FF)] = fp_current;
-		}
+		fp_current->next = search[((fp_current->ciphersuite_length & 0x000F) >> 1 )][((fp_current->tls_version) & 0x00FF)];
+		search[((fp_current->ciphersuite_length & 0x000F) >> 1 )][((fp_current->tls_version) & 0x00FF)] = fp_current;
 	}
-	/* Terminate the linked list */
-	fp_current->next = NULL;
 	printf("Loaded %i signatures\n", fp_count);
 
 	/* XXX END TESTING OF BINARY RULES */
-
 
 	/* XXX HORRIBLE HORRIBLE KLUDGE TO AVOID if's everywhere.  I KNOW OK?! */
 	if(json_fd == NULL) {

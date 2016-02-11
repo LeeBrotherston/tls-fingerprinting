@@ -1000,7 +1000,7 @@ int main(int argc, char **argv) {
 		}
 	}
 	/* Terminate the linked list */
-	fp_current->next = NULL;
+	//fp_current->next = NULL;
 	printf("Loaded %i signatures\n", fp_count);
 
 	/* XXX END TESTING OF BINARY RULES */

@@ -143,26 +143,6 @@ struct fingerprint_new {
   struct    fingerprint_new  *next;
 };
 
-/* pthreads only allow a single argument to be passed, the thread number, so we'll create an array of these
-   the thread can look up it's corresponding "number" in the array and obtain it's own config options */
-
-struct pthread_config {
-  /* Everything from the original args ... except args, because lol */
-  struct pcap_pkthdr *pcap_header;
-  u_char *packet;
-  struct pthread_config *next;
-  uint8_t status;
-  // Status flag used in tandem with mutex for control of the struct.
-  // 0 - Empty and devoid of packets
-  // 1 - Thread to pickup packet
-  // 2 - Initialise
-  uint8_t threadnum;
-  pthread_mutex_t mutex;
-  // Mutex is used to control when a thread takes a packet for processing
-  // unlocked sets it for use by the thread instead of polling
-} *pthread_config_ptr;
-
-
 
 /* This works perfectly well for TLS, but does not catch horrible SSLv2 packets, soooooo.... */
 //char *default_filter = "tcp[tcp[12]/16*4]=22 and (tcp[tcp[12]/16*4+5]=1) and (tcp[tcp[12]/16*4+9]=3) and (tcp[tcp[12]/16*4+1]=3) and (tcp[tcp[12]/16*4+43]=0)";
@@ -181,11 +161,6 @@ FILE *json_fd = NULL;
 FILE *fpdb_fd = NULL;
 struct fingerprint_new *search[8][4];
 char hostname[HOST_NAME_MAX];			/* store the hostname once to save multiple lookups */
-struct pthread_config *my_thread_config;
-pthread_mutex_t log_mutex;
-pthread_mutex_t json_mutex;
-pthread_mutex_t fpdb_mutex;
-pthread_mutex_t pcap_mutex;
 
 
 /* These were in main, but this let's the signal handler close as needed */

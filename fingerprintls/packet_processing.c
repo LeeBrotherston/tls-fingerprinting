@@ -67,9 +67,11 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		/* Anything we need from the pcap_pkthdr */
 		/* ************************************* */
 
-		/* In theory time doesn't need to be first because it's saved in the PCAP
-			 header, however I am keeping it here incase we derive it from somewhere
-			 else in future and we want it early in the process. */
+		/*
+			In theory time doesn't need to be first because it's saved in the PCAP
+			header, however I am keeping it here incase we derive it from somewhere
+			else in future and we want it early in the process.
+		*/
 
 		packet_time = pcap_header->ts;
 		print_time = *localtime(&packet_time.tv_sec);
@@ -382,8 +384,13 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 			/* Increment past the payload of the extensions */
 			ext_id += (packet_data[ext_id + 2]*256) + packet_data[ext_id + 3] + 3;
 
-		}
+			if((packet_data + ext_id) > (payload + size_payload)) {
+				fprintf(stderr, "Offset Beyond end of packet %s:%i to ", src_address_buffer, ntohs(tcp->th_sport));
+				fprintf(stderr, "%s:%i\n", dst_address_buffer, ntohs(tcp->th_dport));
+				return;
+			}
 
+		}
 
 		/* XXX This horrible kludge to get around the 2 length fields.  FIX IT! */
 		// XXX Check that curves are working (being matched, etc)

@@ -96,6 +96,17 @@ struct tcp_header {
         u_short th_urp;                 /* urgent pointer */
 };
 
+
+/*
+  UDP Header
+*/
+struct udp_header {
+    u_int16_t sport;
+    u_int16_t dport;
+    u_int16_t len;
+    u_int16_t check;
+};
+
 #define SSL_MIN_GOOD_VERSION	0x002
 #define SSL_MAX_GOOD_VERSION	0x304
 
@@ -146,7 +157,11 @@ struct fingerprint_new {
 
 /* This works perfectly well for TLS, but does not catch horrible SSLv2 packets, soooooo.... */
 //char *default_filter = "tcp[tcp[12]/16*4]=22 and (tcp[tcp[12]/16*4+5]=1) and (tcp[tcp[12]/16*4+9]=3) and (tcp[tcp[12]/16*4+1]=3) and (tcp[tcp[12]/16*4+43]=0)";
-char *default_filter = "(tcp[tcp[12]/16*4]=22 and (tcp[tcp[12]/16*4+5]=1) and (tcp[tcp[12]/16*4+9]=3) and (tcp[tcp[12]/16*4+1]=3)) or (ip6 and tcp)";
+/*
+  (udp and port 3544) is a temp (development) measure, but refers to Teredo
+*/
+//char *default_filter = "(tcp[tcp[12]/16*4]=22 and (tcp[tcp[12]/16*4+5]=1) and (tcp[tcp[12]/16*4+9]=3) and (tcp[tcp[12]/16*4+1]=3)) or (ip6 and tcp) or (udp and port 3544)";
+char *default_filter = "";
 
 /* This pushes a bunch of pre-processing out to the BPF filter instead of having to deal with it too much in code */
 // Disabled for now becuase it's too noisey... too many false positives

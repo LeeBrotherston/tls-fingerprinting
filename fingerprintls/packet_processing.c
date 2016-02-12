@@ -45,6 +45,8 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		struct ipv4_header *ipv4;         /* The IPv4 header */
 		struct ip6_hdr *ipv6;             /* The IPv6 header */
 		struct tcp_header *tcp;           /* The TCP header */
+		struct udp_header *udp;           /* The UDP header */
+
 		u_char *payload;                  /* Packet payload */
 
 		char *server_name;						/* Server name per the extension */
@@ -82,38 +84,50 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		/* Set pointers to the main parts of the packet */
 		/* ******************************************** */
 
-		while(ip_version==0){
-			/* Ethernet Frame */
-			/* CAREFUL: This will obliterate the src/dst MAC pointers. */
-			ethernet = (struct ether_header*)(packet+size_vlan_offset);
-			/* Determine the ethernet frame type, and handle accordingly */
-			switch(ntohs(ethernet->ether_type)){
-				case ETHERTYPE_VLAN:
-					size_vlan_offset+=4;
-					/* This will loop through to handle nested 802.1Q headers */
-					break;
-				case ETHERTYPE_IP:
-					/* IPv4 */
-					ip_version=4;
-					af_type=AF_INET;
-					break;
-				//case ETHERTYPE_IPV6:
-				case 0x86dd:
-					/* IPv6 */
-					ip_version=6;
-					af_type=AF_INET6;
-					break;
-				default:
-					/* Something's gone wrong... Doesn't appear to be a valid ethernet frame? */
-					if (show_drops)
-						fprintf(stderr, "[%s] Malformed Ethernet frame\n", printable_time);
-					return;
+		/*
+			Ethernet
+		*/
+		/*
+			De-802.1Q things if needed.  This isn't in the switch below so that we don't have to loop
+			back around for IPv4 vs v6 ethertype handling.  This is a special case that we just detangle
+			upfront.  Also avoids a while loop, woo!
+		*/
+		ethernet = (struct ether_header*)(packet);
+		if(ntohs(ethernet->ether_type) == ETHERTYPE_VLAN) {
+			// Using loop to account for double tagging (can you triple?!)
+			for(size_vlan_offset=4;  ethernet->ether_type == ETHERTYPE_VLAN ; size_vlan_offset+=4) {
+				ethernet = (struct ether_header*)(packet+size_vlan_offset);
 			}
 		}
 
+		// Now we can deal with what the ether_type is
+		switch(ntohs(ethernet->ether_type)){
+			case ETHERTYPE_IP:
+				/* IPv4 */
+				ip_version=4;
+				af_type=AF_INET;
+				break;
+			//case ETHERTYPE_IPV6:
+			case 0x86dd:
+				/* IPv6 */
+				ip_version=6;
+				af_type=AF_INET6;
+				break;
+			default:
+				/* Something's gone wrong... Doesn't appear to be a valid ethernet frame? */
+				if (show_drops)
+					fprintf(stderr, "[%s] Malformed Ethernet frame\n", printable_time);
+				return;
+		}
+
+
 		/*
-			Sadly BPF filters are not equal between IPv4 and IPv6 so we cannot rely on this for everything, so
+			Sadly BPF filters are not equal between IPv4 and IPv6 so we cannot rely on them for everything, so
 			this section attempts to cope with that.
+		*/
+
+		/*
+			IP headers
 		*/
 		switch(ip_version) {
 			case 4:
@@ -132,13 +146,26 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 				}
 
 				/* TCP Header */
-				if (ipv4->ip_p != IPPROTO_TCP) {
-					/* Not TCP, not trying.... don't care.  The BPF filter should
-					 * prevent this happening, but if I remove it you can guarantee I'll have
-					 * forgotten an edge case :) */
-					 if (show_drops)
-					 	fprintf(stderr, "[%s] Packet Drop: non-TCP made it though the filter... weird\n", printable_time);
-					return;
+				switch(ipv4->ip_p) {
+				//if (ipv4->ip_p != IPPROTO_TCP) {
+					case IPPROTO_TCP:
+						break;
+
+					case IPPROTO_UDP:
+						udp = (struct udp_header*)(packet + SIZE_ETHERNET + size_vlan_offset + size_ip);
+						/* Is it Teredo? */
+						if(udp->dport == 3544) {
+							ipv6 = (struct ip6_hdr*)(packet + SIZE_ETHERNET + size_vlan_offset + size_ip + sizeof(struct udp_header));
+						}
+						break;
+
+					default:
+						/* Not TCP, not trying.... don't care.  The BPF filter should
+						 * prevent this happening, but if I remove it you can guarantee I'll have
+						 * forgotten an edge case :) */
+						 if (show_drops)
+						 	fprintf(stderr, "[%s] Packet Drop: non-TCP made it though the filter... weird\n", printable_time);
+						return;
 				}
 				break;
 
@@ -189,6 +216,9 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 
 		}
 
+		/*
+			TCP/UDP/Cabbage/Jam
+		*/
 		/* Yay, it's TCP, let's set the pointer */
 		tcp = (struct tcp_header*)(packet + SIZE_ETHERNET + size_vlan_offset + size_ip);
 
@@ -200,7 +230,10 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 			return;
 		}
 
-		/* Packet Payload */
+		/*
+			Packet Payload
+		*/
+
 		/* Set the payload pointer */
 		payload = (u_char *)(packet + SIZE_ETHERNET + size_vlan_offset + size_ip + (tcp->th_off * 4));
 

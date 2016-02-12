@@ -108,77 +108,82 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 					return;
 			}
 		}
+
+		/*
+			Sadly BPF filters are not equal between IPv4 and IPv6 so we cannot rely on this for everything, so
+			this section attempts to cope with that.
+		*/
 		switch(ip_version) {
 			case 4:
-			/* IP Header */
-			ipv4 = (struct ipv4_header*)(packet + SIZE_ETHERNET + size_vlan_offset);
-			size_ip = IP_HL(ipv4)*4;
+				/* IP Header */
+				ipv4 = (struct ipv4_header*)(packet + SIZE_ETHERNET + size_vlan_offset);
+				size_ip = IP_HL(ipv4)*4;
 
-			if (size_ip < 20) {
-				/* This is just wrong, not even bothering */
-				if(show_drops)
-					fprintf(stderr, "[%s] Packet Drop: Invalid IP header length: %u bytes\n", printable_time, size_ip);
-				return;
-			}
-			if(show_drops) {
-				fprintf(stderr, "[%s] Packet Passed header length: %u bytes\n", printable_time, size_ip);
-			}
-
-			/* TCP Header */
-			if (ipv4->ip_p != IPPROTO_TCP) {
-				/* Not TCP, not trying.... don't care.  The BPF filter should
-				 * prevent this happening, but if I remove it you can guarantee I'll have
-				 * forgotten an edge case :) */
-				 if (show_drops)
-				 	fprintf(stderr, "[%s] Packet Drop: non-TCP made it though the filter... weird\n", printable_time);
-				return;
-			}
-			break;
-
-			case 6:
-			/* IP Header */
-			ipv6 = (struct ip6_hdr*)(packet + SIZE_ETHERNET + size_vlan_offset);
-			size_ip = 40;
-
-			/* TODO: Parse 'next header(s)' */
-			//printf("IP Version? %i\n",ntohl(ipv6->ip6_vfc)>>28);
-			//printf("Traffic Class? %i\n",(ntohl(ipv6->ip6_vfc)&0x0ff00000)>>24);
-			//printf("Flow Label? %i\n",ntohl(ipv6->ip6_vfc)&0xfffff);
-			//printf("Payload? %i\n",ntohs(ipv6->ip6_plen));
-			//printf("Next Header? %i\n",ipv6->ip6_nxt);
-
-			/* Note: Because the PCAP Libraries don't allow a BPF to adequately process TCP headers on IPv6
-				 packets we have had to accept all IPv6 TCP packets and so extra processing here to ensure
-				 that they're CLIENT_HELLO that is actually done in the BPF for v4.... damn you PCAP!! */
-
-			// XXX These lines are duplicated, will de-dupe later this is for testing without breaking :)
-			tcp = (struct tcp_header*)(packet + SIZE_ETHERNET + size_vlan_offset + size_ip);
-			payload = (u_char *)(packet + SIZE_ETHERNET + size_vlan_offset + size_ip + (tcp->th_off * 4));
-			// Emulating: "(tcp[tcp[12]/16*4]=22 and (tcp[tcp[12]/16*4+5]=1) and (tcp[tcp[12]/16*4+9]=3) and (tcp[tcp[12]/16*4+1]=3))"
-			if(!(payload[0] == 22 && payload[5] == 1 && payload[9] == 3 && payload[1] == 3))
-				return; /* Doesn't match our not BPF, BPF.... BAILING OUT!! */
-
-
-			/* Sanity Check... Should be IPv6 */
-			if ((ntohl(ipv6->ip6_vfc)>>28)!=6){
-				if(show_drops)
-					fprintf(stderr, "[%s] Packet Drop: Invalid IPv6 header\n", printable_time);
-				return;
-			}
-
-			switch(ipv6->ip6_nxt){
-				case 6:		/* TCP */
-					break;
-				case 17:	/* UDP */
-				case 58:	/* ICMPv6 */
+				if (size_ip < 20) {
+					/* This is just wrong, not even bothering */
 					if(show_drops)
+						fprintf(stderr, "[%s] Packet Drop: Invalid IP header length: %u bytes\n", printable_time, size_ip);
+					return;
+				}
+				if(show_drops) {
+					fprintf(stderr, "[%s] Packet Passed header length: %u bytes\n", printable_time, size_ip);
+				}
+
+				/* TCP Header */
+				if (ipv4->ip_p != IPPROTO_TCP) {
+					/* Not TCP, not trying.... don't care.  The BPF filter should
+					 * prevent this happening, but if I remove it you can guarantee I'll have
+					 * forgotten an edge case :) */
+					 if (show_drops)
 					 	fprintf(stderr, "[%s] Packet Drop: non-TCP made it though the filter... weird\n", printable_time);
 					return;
+				}
+				break;
 
-				default:
-					printf("[%s] Packet Drop: Unhandled IPv6 next header: %i\n",printable_time, ipv6->ip6_nxt);
+			case 6:
+				/* IP Header */
+				ipv6 = (struct ip6_hdr*)(packet + SIZE_ETHERNET + size_vlan_offset);
+				size_ip = 40;
+
+				/* TODO: Parse 'next header(s)' */
+				//printf("IP Version? %i\n",ntohl(ipv6->ip6_vfc)>>28);
+				//printf("Traffic Class? %i\n",(ntohl(ipv6->ip6_vfc)&0x0ff00000)>>24);
+				//printf("Flow Label? %i\n",ntohl(ipv6->ip6_vfc)&0xfffff);
+				//printf("Payload? %i\n",ntohs(ipv6->ip6_plen));
+				//printf("Next Header? %i\n",ipv6->ip6_nxt);
+
+				/* Note: Because the PCAP Libraries don't allow a BPF to adequately process TCP headers on IPv6
+					 packets we have had to accept all IPv6 TCP packets and so extra processing here to ensure
+					 that they're CLIENT_HELLO that is actually done in the BPF for v4.... damn you PCAP!! */
+
+				// XXX These lines are duplicated, will de-dupe later this is for testing without breaking :)
+				tcp = (struct tcp_header*)(packet + SIZE_ETHERNET + size_vlan_offset + size_ip);
+				payload = (u_char *)(packet + SIZE_ETHERNET + size_vlan_offset + size_ip + (tcp->th_off * 4));
+				// Emulating: "(tcp[tcp[12]/16*4]=22 and (tcp[tcp[12]/16*4+5]=1) and (tcp[tcp[12]/16*4+9]=3) and (tcp[tcp[12]/16*4+1]=3))"
+				if(!(payload[0] == 22 && payload[5] == 1 && payload[9] == 3 && payload[1] == 3))
+					return; /* Doesn't match our not BPF, BPF.... BAILING OUT!! */
+
+
+				/* Sanity Check... Should be IPv6 */
+				if ((ntohl(ipv6->ip6_vfc)>>28)!=6){
+					if(show_drops)
+						fprintf(stderr, "[%s] Packet Drop: Invalid IPv6 header\n", printable_time);
 					return;
-			}
+				}
+
+				switch(ipv6->ip6_nxt){
+					case 6:		/* TCP */
+						break;
+					case 17:	/* UDP */
+					case 58:	/* ICMPv6 */
+						if(show_drops)
+						 	fprintf(stderr, "[%s] Packet Drop: non-TCP made it though the filter... weird\n", printable_time);
+						return;
+
+					default:
+						printf("[%s] Packet Drop: Unhandled IPv6 next header: %i\n",printable_time, ipv6->ip6_nxt);
+						return;
+				}
 
 		}
 
@@ -231,10 +236,10 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		}
 
 		/* Check the size of the sessionid */
-		const u_char *cipher_data = &payload[OFFSET_SESSION_LENGTH];
-		if (size_payload < OFFSET_SESSION_LENGTH + cipher_data[0] + 3) {
+		const u_char *packet_data = &payload[OFFSET_SESSION_LENGTH];
+		if (size_payload < OFFSET_SESSION_LENGTH + packet_data[0] + 3) {
 			if(show_drops)
-				printf("[%s] Packet Drop: Session ID looks bad [%i] [%i]\n", printable_time, size_payload, (OFFSET_SESSION_LENGTH + cipher_data[0] + 3) );
+				printf("[%s] Packet Drop: Session ID looks bad [%i] [%i]\n", printable_time, size_payload, (OFFSET_SESSION_LENGTH + packet_data[0] + 3) );
 			return;
 		}
 
@@ -260,22 +265,22 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		fp_packet->tls_version = (payload[OFFSET_HELLO_VERSION]*256) + payload[OFFSET_HELLO_VERSION+1];
 
 		/* CipherSuite */
-		cipher_data += 1 + cipher_data[0];
-		u_short cs_len = cipher_data[0]*256 + cipher_data[1];
+		packet_data += 1 + packet_data[0];
+		u_short cs_len = packet_data[0]*256 + packet_data[1];
 		/* Length */
-		fp_packet->ciphersuite_length = (cipher_data[0]*256) + cipher_data[1];
+		fp_packet->ciphersuite_length = (packet_data[0]*256) + packet_data[1];
 
 
 		/*
 			CipherSuites
 		*/
-		cipher_data += 2; // skip cipher suites length
-		fp_packet->ciphersuite = (uint8_t *)cipher_data;
+		packet_data += 2; // skip cipher suites length
+		fp_packet->ciphersuite = (uint8_t *)packet_data;
 
 		/*
 			Compression
 		*/
-		u_short comp_len = cipher_data[cs_len];
+		u_short comp_len = packet_data[cs_len];
 
 		/*
 			Length
@@ -285,19 +290,19 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		/*
 			Compression List
 		*/
-		cipher_data += cs_len + 1;
-		fp_packet->compression = (uint8_t *)cipher_data;
+		packet_data += cs_len + 1;
+		fp_packet->compression = (uint8_t *)packet_data;
 
 		/*
 			Extensions
 		*/
-		u_short ext_len = cipher_data[comp_len]*256 + cipher_data[comp_len+1];
+		u_short ext_len = packet_data[comp_len]*256 + packet_data[comp_len+1];
 		int ext_id, ext_count = 0;
 
 		/*
 			Length
 		*/
-		cipher_data += comp_len + 2;
+		packet_data += comp_len + 2;
 
 		/*
 			Set optional data to NULL in advance
@@ -311,13 +316,13 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		/*
 			So this works - so overall length seems ok
 		*/
-		uint8_t *extensions_tmp_ptr = (uint8_t *)cipher_data;
+		uint8_t *extensions_tmp_ptr = (uint8_t *)packet_data;
 
 		/*
 			If we are at the end of the packet we have no extensions, without this
 			we will just run off the end of the packet into unallocated space :/
 		*/
-		if(cipher_data - payload > size_payload) {
+		if(packet_data - payload > size_payload) {
 			ext_len = 0;
 		}
 		/* Loop through the extensions */
@@ -326,26 +331,26 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 			int ext_type;
 
 			/* Set the extension type */
-			ext_type = (cipher_data[ext_id]*256) + cipher_data[ext_id + 1];
+			ext_type = (packet_data[ext_id]*256) + packet_data[ext_id + 1];
 			ext_count++;
 
 			/* Handle some special cases */
 			switch(ext_type) {
 				case 0x000a:
 					/* elliptic_curves */
-					fp_packet->curves = (uint8_t *)&cipher_data[ext_id + 2];
+					fp_packet->curves = (uint8_t *)&packet_data[ext_id + 2];
 					/* 2 & 3, not 0 & 1 because of 2nd length field */
 					fp_packet->curves_length = fp_packet->curves[2]*256 + fp_packet->curves[3];
 					break;
 				case 0x000b:
 					/* ec_point formats */
-					fp_packet->ec_point_fmt = (uint8_t *)&cipher_data[ext_id + 2];
+					fp_packet->ec_point_fmt = (uint8_t *)&packet_data[ext_id + 2];
 					fp_packet->ec_point_fmt_length = fp_packet->ec_point_fmt[2];
 					//printf("ec point length: %i\n", fp_packet->ec_point_fmt_length);
 					break;
 				case 0x000d:
 					/* Signature algorithms */
-					fp_packet->sig_alg = (uint8_t *)&cipher_data[ext_id + 2];
+					fp_packet->sig_alg = (uint8_t *)&packet_data[ext_id + 2];
 					fp_packet->sig_alg_length = fp_packet->sig_alg[2]*256 + fp_packet->sig_alg[3];
 					break;
 				case 0x0000:
@@ -354,7 +359,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 					 * of packets during signature creation.
 					 */
 					/* Server Name */
-					server_name = (char *)&cipher_data[ext_id+2];
+					server_name = (char *)&packet_data[ext_id+2];
 					break;
 
 				/* Some potential new extenstions to exploit for fingerprint material */
@@ -375,7 +380,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 			fp_packet->extensions_length = (ext_count * 2);
 
 			/* Increment past the payload of the extensions */
-			ext_id += (cipher_data[ext_id + 2]*256) + cipher_data[ext_id + 3] + 3;
+			ext_id += (packet_data[ext_id + 2]*256) + packet_data[ext_id + 3] + 3;
 
 		}
 
@@ -494,7 +499,6 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 						fprintf(stdout, "Not Set");
 					}
 					fprintf(stdout, "\"");
-
 					if(matchcount > 1)
 						/* This shouldn't happen, but is useful to debug duplicate fingerprints */
 

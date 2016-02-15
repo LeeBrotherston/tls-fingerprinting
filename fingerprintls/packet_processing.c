@@ -162,17 +162,10 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 
 						udp = (struct udp_header*)(packet + SIZE_ETHERNET + size_vlan_offset + size_ip);
 						teredo = (struct teredo_header*)(udp + 1);  /* +1 is UDP header, not bytes ;) */
-						tcp = (struct tcp_header*)(packet + SIZE_ETHERNET + size_vlan_offset + size_ip + 8 + sizeof(struct teredo_header));
+						//tcp = (struct tcp_header*)(packet + SIZE_ETHERNET + size_vlan_offset + size_ip + 8 + sizeof(struct teredo_header));
 
-						/* Testing how to later integrate */
+						/* setting offset later with size_ip manipulation...  may need to ammend this */
 						size_ip += sizeof(struct udp_header) + sizeof(struct teredo_header);
-
-
-						//printf("Teredo Debug -> UDP src: %i  dst: %i\n", ntohs(udp->sport), ntohs(udp->dport));
-						//inet_ntop(AF_INET6,(void*)&teredo->ip6_src,src_address_buffer,sizeof(src_address_buffer));
-						//inet_ntop(AF_INET6,(void*)&teredo->ip6_dst,dst_address_buffer,sizeof(dst_address_buffer));
-						//printf("Teredo Debug: %s -> %s\n", src_address_buffer, dst_address_buffer);
-
 						break;
 
 					default:

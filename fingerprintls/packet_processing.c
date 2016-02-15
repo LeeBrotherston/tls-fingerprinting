@@ -46,6 +46,8 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		struct ip6_hdr *ipv6;             /* The IPv6 header */
 		struct tcp_header *tcp;           /* The TCP header */
 		struct udp_header *udp;           /* The UDP header */
+		struct teredo_header *teredo;			/* Teredo header */
+
 
 		u_char *payload;                  /* Packet payload */
 
@@ -147,16 +149,30 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 
 				/* TCP Header */
 				switch(ipv4->ip_p) {
-				//if (ipv4->ip_p != IPPROTO_TCP) {
 					case IPPROTO_TCP:
 						break;
 
 					case IPPROTO_UDP:
+						/*
+							As it stands currently, the BPF should ensure that the *only* UDP is Teredo with TLS IPv6 packets inside,
+							thus I'm going to assume that is the case for now and set ip_version to 5 (4 to 6 intermediary as I will
+							never have to support actual IPv5).
+						*/
+						ip_version = 5;
+
 						udp = (struct udp_header*)(packet + SIZE_ETHERNET + size_vlan_offset + size_ip);
-						/* Is it Teredo? */
-						if(udp->dport == 3544) {
-							ipv6 = (struct ip6_hdr*)(packet + SIZE_ETHERNET + size_vlan_offset + size_ip + sizeof(struct udp_header));
-						}
+						teredo = (struct teredo_header*)(udp + 1);  /* +1 is UDP header, not bytes ;) */
+						tcp = (struct tcp_header*)(packet + SIZE_ETHERNET + size_vlan_offset + size_ip + 8 + sizeof(struct teredo_header));
+
+						/* Testing how to later integrate */
+						size_ip += sizeof(struct udp_header) + sizeof(struct teredo_header);
+
+
+						//printf("Teredo Debug -> UDP src: %i  dst: %i\n", ntohs(udp->sport), ntohs(udp->dport));
+						//inet_ntop(AF_INET6,(void*)&teredo->ip6_src,src_address_buffer,sizeof(src_address_buffer));
+						//inet_ntop(AF_INET6,(void*)&teredo->ip6_dst,dst_address_buffer,sizeof(dst_address_buffer));
+						//printf("Teredo Debug: %s -> %s\n", src_address_buffer, dst_address_buffer);
+
 						break;
 
 					default:
@@ -284,14 +300,23 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 
 		/* ID and Desc (with defaults for unknown fingerprints) */
 		fp_packet->fingerprint_id = 0;
-		if (ip_version==4) {
-			inet_ntop(af_type,(void*)&ipv4->ip_src,src_address_buffer,sizeof(src_address_buffer));
-			inet_ntop(af_type,(void*)&ipv4->ip_dst,dst_address_buffer,sizeof(dst_address_buffer));
+		switch(ip_version) {
+			case 5:
+				/* Temporarily Doing this to PoC teredo.  Will use outer and inner once it's working */
+				/* IPv4 source and IPv6 dest is sorta what the connection is, so temping with that */
+				inet_ntop(AF_INET,(void*)&ipv4->ip_src,src_address_buffer,sizeof(src_address_buffer));
+				inet_ntop(AF_INET6,(void*)&teredo->ip6_dst,dst_address_buffer,sizeof(dst_address_buffer));
+				break;
+			case 4:
+				inet_ntop(af_type,(void*)&ipv4->ip_src,src_address_buffer,sizeof(src_address_buffer));
+				inet_ntop(af_type,(void*)&ipv4->ip_dst,dst_address_buffer,sizeof(dst_address_buffer));
+				break;
+			case 6:
+				inet_ntop(af_type,(void*)&ipv6->ip6_src,src_address_buffer,sizeof(src_address_buffer));
+				inet_ntop(af_type,(void*)&ipv6->ip6_dst,dst_address_buffer,sizeof(dst_address_buffer));
+				break;
 		}
-		else if (ip_version==6) {
-			inet_ntop(af_type,(void*)&ipv6->ip6_src,src_address_buffer,sizeof(src_address_buffer));
-			inet_ntop(af_type,(void*)&ipv6->ip6_dst,dst_address_buffer,sizeof(dst_address_buffer));
-		}
+
 
 		/* TLS Version (Record Layer - not proper proper) */
 		fp_packet->record_tls_version = (payload[1]*256) + payload[2];

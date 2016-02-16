@@ -89,23 +89,41 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		/*
 			Ethernet
 		*/
+
 		/*
-			De-802.1Q things if needed.  This isn't in the switch below so that we don't have to loop
-			back around for IPv4 vs v6 ethertype handling.  This is a special case that we just detangle
-			upfront.  Also avoids a while loop, woo!
+			Section to deal with random low layer stuff before we get to IP
 		*/
+
 		ethernet = (struct ether_header*)(packet);
-		if(ntohs(ethernet->ether_type) == ETHERTYPE_VLAN) {
-			// Using loop to account for double tagging (can you triple?!)
-			for(size_vlan_offset=4;  ethernet->ether_type == ETHERTYPE_VLAN ; size_vlan_offset+=4) {
-				ethernet = (struct ether_header*)(packet+size_vlan_offset);
-			}
+		switch(ntohs(ethernet->ether_type)) {
+			/*
+				De-802.1Q things if needed.  This isn't in the switch below so that we don't have to loop
+				back around for IPv4 vs v6 ethertype handling.  This is a special case that we just detangle
+				upfront.  Also avoids a while loop, woo!
+			*/
+			case ETHERTYPE_VLAN:
+				// Using loop to account for double tagging (can you triple?!)
+				for(size_vlan_offset=4;  ethernet->ether_type == ETHERTYPE_VLAN ; size_vlan_offset+=4) {
+					ethernet = (struct ether_header*)(packet+size_vlan_offset);
+				}
+				break;
+			/* PPPoE */
+			case 0x8864:
+				// XXX Need to research further but seems skipping 8 bytes is all we need?  But how.... hmmmm...
+				//ethernet = (struct ether_header*)(packet + size_vlan_offset + 8);
+
+				// XXX yeah this totally doesn't work yet....  fix this :)
+
+				// XXX oh doh, BPF?!
+				printf("PPPoE\n");
+				break;
 		}
 
 		// Now we can deal with what the ether_type is
 		switch(ntohs(ethernet->ether_type)){
 			case ETHERTYPE_IP:
 				/* IPv4 */
+				printf("v4\n");
 				ip_version=4;
 				af_type=AF_INET;
 				break;
@@ -166,6 +184,11 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 
 						/* setting offset later with size_ip manipulation...  may need to ammend this */
 						size_ip += sizeof(struct udp_header) + sizeof(struct teredo_header);
+						break;
+
+					case 0x29:
+						/* Not using this yet, but here ready for when I impliment 6in4 de-encapsultion (per teredo) */
+						//printf("6in4?!\n");
 						break;
 
 					default:

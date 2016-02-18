@@ -45,6 +45,10 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		struct ipv4_header *ipv4;         /* The IPv4 header */
 		struct ip6_hdr *ipv6;             /* The IPv6 header */
 		struct tcp_header *tcp;           /* The TCP header */
+		struct udp_header *udp;           /* The UDP header */
+		struct teredo_header *teredo;			/* Teredo header */
+
+
 		u_char *payload;                  /* Packet payload */
 
 		char *server_name;						/* Server name per the extension */
@@ -82,38 +86,68 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		/* Set pointers to the main parts of the packet */
 		/* ******************************************** */
 
-		while(ip_version==0){
-			/* Ethernet Frame */
-			/* CAREFUL: This will obliterate the src/dst MAC pointers. */
-			ethernet = (struct ether_header*)(packet+size_vlan_offset);
-			/* Determine the ethernet frame type, and handle accordingly */
-			switch(ntohs(ethernet->ether_type)){
-				case ETHERTYPE_VLAN:
-					size_vlan_offset+=4;
-					/* This will loop through to handle nested 802.1Q headers */
-					break;
-				case ETHERTYPE_IP:
-					/* IPv4 */
-					ip_version=4;
-					af_type=AF_INET;
-					break;
-				//case ETHERTYPE_IPV6:
-				case 0x86dd:
-					/* IPv6 */
-					ip_version=6;
-					af_type=AF_INET6;
-					break;
-				default:
-					/* Something's gone wrong... Doesn't appear to be a valid ethernet frame? */
-					if (show_drops)
-						fprintf(stderr, "[%s] Malformed Ethernet frame\n", printable_time);
-					return;
-			}
-		}
+		/*
+			Ethernet
+		*/
 
 		/*
-			Sadly BPF filters are not equal between IPv4 and IPv6 so we cannot rely on this for everything, so
+			Section to deal with random low layer stuff before we get to IP
+		*/
+
+		ethernet = (struct ether_header*)(packet);
+		switch(ntohs(ethernet->ether_type)) {
+			/*
+				De-802.1Q things if needed.  This isn't in the switch below so that we don't have to loop
+				back around for IPv4 vs v6 ethertype handling.  This is a special case that we just detangle
+				upfront.  Also avoids a while loop, woo!
+			*/
+			case ETHERTYPE_VLAN:
+				// Using loop to account for double tagging (can you triple?!)
+				for(size_vlan_offset=4;  ethernet->ether_type == ETHERTYPE_VLAN ; size_vlan_offset+=4) {
+					ethernet = (struct ether_header*)(packet+size_vlan_offset);
+				}
+				break;
+			/* PPPoE */
+			case 0x8864:
+				// XXX Need to research further but seems skipping 8 bytes is all we need?  But how.... hmmmm...
+				//ethernet = (struct ether_header*)(packet + size_vlan_offset + 8);
+
+				// XXX yeah this totally doesn't work yet....  fix this :)
+
+				// XXX oh doh, BPF?!
+				printf("PPPoE\n");
+				break;
+		}
+
+		// Now we can deal with what the ether_type is
+		switch(ntohs(ethernet->ether_type)){
+			case ETHERTYPE_IP:
+				/* IPv4 */
+				printf("v4\n");
+				ip_version=4;
+				af_type=AF_INET;
+				break;
+			//case ETHERTYPE_IPV6:
+			case 0x86dd:
+				/* IPv6 */
+				ip_version=6;
+				af_type=AF_INET6;
+				break;
+			default:
+				/* Something's gone wrong... Doesn't appear to be a valid ethernet frame? */
+				if (show_drops)
+					fprintf(stderr, "[%s] Malformed Ethernet frame\n", printable_time);
+				return;
+		}
+
+
+		/*
+			Sadly BPF filters are not equal between IPv4 and IPv6 so we cannot rely on them for everything, so
 			this section attempts to cope with that.
+		*/
+
+		/*
+			IP headers
 		*/
 		switch(ip_version) {
 			case 4:
@@ -132,13 +166,38 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 				}
 
 				/* TCP Header */
-				if (ipv4->ip_p != IPPROTO_TCP) {
-					/* Not TCP, not trying.... don't care.  The BPF filter should
-					 * prevent this happening, but if I remove it you can guarantee I'll have
-					 * forgotten an edge case :) */
-					 if (show_drops)
-					 	fprintf(stderr, "[%s] Packet Drop: non-TCP made it though the filter... weird\n", printable_time);
-					return;
+				switch(ipv4->ip_p) {
+					case IPPROTO_TCP:
+						break;
+
+					case IPPROTO_UDP:
+						/*
+							As it stands currently, the BPF should ensure that the *only* UDP is Teredo with TLS IPv6 packets inside,
+							thus I'm going to assume that is the case for now and set ip_version to 5 (4 to 6 intermediary as I will
+							never have to support actual IPv5).
+						*/
+						ip_version = 5;
+
+						udp = (struct udp_header*)(packet + SIZE_ETHERNET + size_vlan_offset + size_ip);
+						teredo = (struct teredo_header*)(udp + 1);  /* +1 is UDP header, not bytes ;) */
+						//tcp = (struct tcp_header*)(packet + SIZE_ETHERNET + size_vlan_offset + size_ip + 8 + sizeof(struct teredo_header));
+
+						/* setting offset later with size_ip manipulation...  may need to ammend this */
+						size_ip += sizeof(struct udp_header) + sizeof(struct teredo_header);
+						break;
+
+					case 0x29:
+						/* Not using this yet, but here ready for when I impliment 6in4 de-encapsultion (per teredo) */
+						//printf("6in4?!\n");
+						break;
+
+					default:
+						/* Not TCP, not trying.... don't care.  The BPF filter should
+						 * prevent this happening, but if I remove it you can guarantee I'll have
+						 * forgotten an edge case :) */
+						 if (show_drops)
+						 	fprintf(stderr, "[%s] Packet Drop: non-TCP made it though the filter... weird\n", printable_time);
+						return;
 				}
 				break;
 
@@ -189,6 +248,9 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 
 		}
 
+		/*
+			TCP/UDP/Cabbage/Jam
+		*/
 		/* Yay, it's TCP, let's set the pointer */
 		tcp = (struct tcp_header*)(packet + SIZE_ETHERNET + size_vlan_offset + size_ip);
 
@@ -200,7 +262,10 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 			return;
 		}
 
-		/* Packet Payload */
+		/*
+			Packet Payload
+		*/
+
 		/* Set the payload pointer */
 		payload = (u_char *)(packet + SIZE_ETHERNET + size_vlan_offset + size_ip + (tcp->th_off * 4));
 
@@ -251,14 +316,23 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 
 		/* ID and Desc (with defaults for unknown fingerprints) */
 		fp_packet->fingerprint_id = 0;
-		if (ip_version==4) {
-			inet_ntop(af_type,(void*)&ipv4->ip_src,src_address_buffer,sizeof(src_address_buffer));
-			inet_ntop(af_type,(void*)&ipv4->ip_dst,dst_address_buffer,sizeof(dst_address_buffer));
+		switch(ip_version) {
+			case 5:
+				/* Temporarily Doing this to PoC teredo.  Will use outer and inner once it's working */
+				/* IPv4 source and IPv6 dest is sorta what the connection is, so temping with that */
+				inet_ntop(AF_INET,(void*)&ipv4->ip_src,src_address_buffer,sizeof(src_address_buffer));
+				inet_ntop(AF_INET6,(void*)&teredo->ip6_dst,dst_address_buffer,sizeof(dst_address_buffer));
+				break;
+			case 4:
+				inet_ntop(af_type,(void*)&ipv4->ip_src,src_address_buffer,sizeof(src_address_buffer));
+				inet_ntop(af_type,(void*)&ipv4->ip_dst,dst_address_buffer,sizeof(dst_address_buffer));
+				break;
+			case 6:
+				inet_ntop(af_type,(void*)&ipv6->ip6_src,src_address_buffer,sizeof(src_address_buffer));
+				inet_ntop(af_type,(void*)&ipv6->ip6_dst,dst_address_buffer,sizeof(dst_address_buffer));
+				break;
 		}
-		else if (ip_version==6) {
-			inet_ntop(af_type,(void*)&ipv6->ip6_src,src_address_buffer,sizeof(src_address_buffer));
-			inet_ntop(af_type,(void*)&ipv6->ip6_dst,dst_address_buffer,sizeof(dst_address_buffer));
-		}
+
 
 		/* TLS Version (Record Layer - not proper proper) */
 		fp_packet->record_tls_version = (payload[1]*256) + payload[2];

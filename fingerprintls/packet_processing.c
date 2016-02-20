@@ -123,7 +123,6 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		switch(ntohs(ethernet->ether_type)){
 			case ETHERTYPE_IP:
 				/* IPv4 */
-				printf("v4\n");
 				ip_version=4;
 				af_type=AF_INET;
 				break;
@@ -165,7 +164,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 					fprintf(stderr, "[%s] Packet Passed header length: %u bytes\n", printable_time, size_ip);
 				}
 
-				/* TCP Header */
+				/* Protocol */
 				switch(ipv4->ip_p) {
 					case IPPROTO_TCP:
 						break;
@@ -188,7 +187,17 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 
 					case 0x29:
 						/* Not using this yet, but here ready for when I impliment 6in4 de-encapsultion (per teredo) */
-						//printf("6in4?!\n");
+						ip_version = 9;  // No reason... YOLO
+						ipv6 = (struct ip6_hdr*)(packet + SIZE_ETHERNET + size_vlan_offset + sizeof(struct ipv4_header));
+
+						// OK This works ok
+						//inet_ntop(AF_INET,(void*)&ipv4->ip_src,src_address_buffer,sizeof(src_address_buffer));
+						//inet_ntop(AF_INET6,(void*)&ipv6->ip6_dst,dst_address_buffer,sizeof(dst_address_buffer));
+						//printf("6in4: %s -> %s\n", src_address_buffer, dst_address_buffer);
+
+						/* used later to get tcp offsets */
+						//size_ip += sizeof(struct ip6_hdr);
+						size_ip += 40;
 						break;
 
 					default:
@@ -293,7 +302,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 			default:
 				/* Doesn't look like a valid TLS version.... probably not even a TLS packet, if it is, it's a bad one */
 				if(show_drops)
-					printf("[%s] Packet Drop: Bad TLS Version\n", printable_time);
+					printf("[%s] Packet Drop: Bad TLS Version %X%X\n", printable_time, payload[OFFSET_HELLO_VERSION], payload[OFFSET_HELLO_VERSION+1]);
 					//printf("%X %X %X %X\n",payload[OFFSET_HELLO_VERSION-8],payload[OFFSET_HELLO_VERSION-7],payload[OFFSET_HELLO_VERSION-6],payload[OFFSET_HELLO_VERSION-5]);
 					//printf("%X %X %X %X\n",payload[OFFSET_HELLO_VERSION-4],payload[OFFSET_HELLO_VERSION-3],payload[OFFSET_HELLO_VERSION-2],payload[OFFSET_HELLO_VERSION-1]);
 					//printf("%X %X %X %X\n",payload[OFFSET_HELLO_VERSION],payload[OFFSET_HELLO_VERSION+1],payload[OFFSET_HELLO_VERSION+2],payload[OFFSET_HELLO_VERSION+3]);
@@ -331,6 +340,9 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 				inet_ntop(af_type,(void*)&ipv6->ip6_src,src_address_buffer,sizeof(src_address_buffer));
 				inet_ntop(af_type,(void*)&ipv6->ip6_dst,dst_address_buffer,sizeof(dst_address_buffer));
 				break;
+			case 9:
+				inet_ntop(AF_INET,(void*)&ipv4->ip_src,src_address_buffer,sizeof(src_address_buffer));
+				inet_ntop(AF_INET6,(void*)&ipv6->ip6_dst,dst_address_buffer,sizeof(dst_address_buffer));
 		}
 
 
@@ -682,7 +694,6 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 				printf("Not Set");
 			}
 			printf("\"\n");
-
 
 			// Should just for json_fd being /dev/null and skip .. optimisation...
 			// or make an output function linked list XXX

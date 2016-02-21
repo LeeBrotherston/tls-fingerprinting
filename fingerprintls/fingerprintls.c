@@ -71,6 +71,7 @@ void print_usage(char *bin_name) {
 	fprintf(stderr, "    -h                This message\n");
 	fprintf(stderr, "    -i <interface>    Sniff packets from specified interface\n");
 	fprintf(stderr, "    -p <pcap file>    Read packets from specified pcap file\n");
+	fprintf(stderr, "    -P <pcap file>    Save packets to specified pcap file for unknown fingerprints\n");
 	fprintf(stderr, "    -j <json file>    Output JSON fingerprints\n");
 	fprintf(stderr, "    -s                Output JSON signatures of unknown connections to stdout\n");
 	fprintf(stderr, "    -d                Show reasons for discarded packets (post BPF)\n");
@@ -91,6 +92,7 @@ int main(int argc, char **argv) {
 	char *unpriv_user = NULL;							/* User for dropping privs */
 	char errbuf[PCAP_ERRBUF_SIZE];				/* error buffer */
 	extern pcap_t *handle;								/* packet capture handle */
+	extern pcap_t *output_handle;					/* output to pcap handle */
 
 	char *filter_exp = default_filter;
 	int arg_start = 1, i;
@@ -130,6 +132,11 @@ int main(int argc, char **argv) {
 				handle = pcap_open_offline(argv[++i], errbuf);
 				printf("Reading from file: %s\n", argv[i]);
 				break;
+			case 'P':
+				/* Open the file */
+				handle = pcap_open_offline(argv[++i], errbuf);
+				printf("Reading from file: %s\n", argv[i]);
+				break;
 			case 'i':
 				/* Open the interface */
 				/* Check if file already successfully opened, if bad filename we can fail to sniffing */
@@ -152,6 +159,7 @@ int main(int argc, char **argv) {
 				/* JSON output to stdout */
 				if((json_fd = fopen("/dev/stdout", "a")) == NULL) {
 					printf("Cannot open JSON file for output\n");
+					fprintf(json_fd, "FD TEST\n");
 					exit(-1);
 				}
 				break;

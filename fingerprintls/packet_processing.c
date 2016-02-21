@@ -112,9 +112,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 				// XXX Need to research further but seems skipping 8 bytes is all we need?  But how.... hmmmm...
 				//ethernet = (struct ether_header*)(packet + size_vlan_offset + 8);
 
-				// XXX yeah this totally doesn't work yet....  fix this :)
-
-				// XXX oh doh, BPF?!
+				//  This is just a placeholder for now.  BPF will probably need updating.
 				printf("PPPoE\n");
 				break;
 		}
@@ -175,7 +173,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 							thus I'm going to assume that is the case for now and set ip_version to 5 (4 to 6 intermediary as I will
 							never have to support actual IPv5).
 						*/
-						ip_version = 5;
+						ip_version = 7;
 
 						udp = (struct udp_header*)(packet + SIZE_ETHERNET + size_vlan_offset + size_ip);
 						teredo = (struct teredo_header*)(udp + 1);  /* +1 is UDP header, not bytes ;) */
@@ -187,7 +185,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 
 					case 0x29:
 						/* Not using this yet, but here ready for when I impliment 6in4 de-encapsultion (per teredo) */
-						ip_version = 9;  // No reason... YOLO
+						ip_version = 8;  // No reason... YOLO
 						ipv6 = (struct ip6_hdr*)(packet + SIZE_ETHERNET + size_vlan_offset + sizeof(struct ipv4_header));
 
 						// OK This works ok
@@ -230,7 +228,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 				tcp = (struct tcp_header*)(packet + SIZE_ETHERNET + size_vlan_offset + size_ip);
 				payload = (u_char *)(packet + SIZE_ETHERNET + size_vlan_offset + size_ip + (tcp->th_off * 4));
 				// Emulating: "(tcp[tcp[12]/16*4]=22 and (tcp[tcp[12]/16*4+5]=1) and (tcp[tcp[12]/16*4+9]=3) and (tcp[tcp[12]/16*4+1]=3))"
-				if(!(payload[0] == 22 && payload[5] == 1 && payload[9] == 3 && payload[1] == 3))
+				//if(!(payload[0] == 22 && payload[5] == 1 && payload[9] == 3 && payload[1] == 3))
 					return; /* Doesn't match our not BPF, BPF.... BAILING OUT!! */
 
 
@@ -326,7 +324,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		/* ID and Desc (with defaults for unknown fingerprints) */
 		fp_packet->fingerprint_id = 0;
 		switch(ip_version) {
-			case 5:
+			case 7:
 				/* Temporarily Doing this to PoC teredo.  Will use outer and inner once it's working */
 				/* IPv4 source and IPv6 dest is sorta what the connection is, so temping with that */
 				inet_ntop(AF_INET,(void*)&ipv4->ip_src,src_address_buffer,sizeof(src_address_buffer));
@@ -340,7 +338,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 				inet_ntop(af_type,(void*)&ipv6->ip6_src,src_address_buffer,sizeof(src_address_buffer));
 				inet_ntop(af_type,(void*)&ipv6->ip6_dst,dst_address_buffer,sizeof(dst_address_buffer));
 				break;
-			case 9:
+			case 8:
 				inet_ntop(AF_INET,(void*)&ipv4->ip_src,src_address_buffer,sizeof(src_address_buffer));
 				inet_ntop(AF_INET6,(void*)&ipv6->ip6_dst,dst_address_buffer,sizeof(dst_address_buffer));
 		}

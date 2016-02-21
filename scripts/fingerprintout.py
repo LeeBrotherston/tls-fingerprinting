@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python2
 
 # XXX Recalculate the sizes for int's instead of char arrays
 # XXX Work out how to pre-populate as ints instead of char arrays

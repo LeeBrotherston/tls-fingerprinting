@@ -71,7 +71,7 @@ void print_usage(char *bin_name) {
 	fprintf(stderr, "    -h                This message\n");
 	fprintf(stderr, "    -i <interface>    Sniff packets from specified interface\n");
 	fprintf(stderr, "    -p <pcap file>    Read packets from specified pcap file\n");
-	fprintf(stderr, "    -P <pcap file>    Save packets to specified pcap file for unknown fingerprints\n");
+//	fprintf(stderr, "    -P <pcap file>    Save packets to specified pcap file for unknown fingerprints\n");
 	fprintf(stderr, "    -j <json file>    Output JSON fingerprints\n");
 	fprintf(stderr, "    -s                Output JSON signatures of unknown connections to stdout\n");
 	fprintf(stderr, "    -d                Show reasons for discarded packets (post BPF)\n");

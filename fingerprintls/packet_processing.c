@@ -607,7 +607,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 							break;
 						 case 6:
 						 	/* IPv6 */
-							fprintf(log_fd, "ipv6\", ");
+							fprintf(log_fd, "\"ipv6\", ");
 							inet_ntop(af_type,(void*)&ipv6->ip6_src,src_address_buffer,sizeof(src_address_buffer));
 							inet_ntop(af_type,(void*)&ipv6->ip6_dst,dst_address_buffer,sizeof(dst_address_buffer));
 							fprintf(log_fd, "\"ipv6_src\": \"%s\", ", src_address_buffer);
@@ -623,7 +623,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 							 * scenarios, however the "ip_version" field makes it clear that this is an encapsulted
 							 * tunnel.
 							 */
-							fprintf(log_fd, "teredo\", ");
+							fprintf(log_fd, "\"teredo\", ");
 							inet_ntop(af_type,(void*)&ipv4->ip_src,src_address_buffer,sizeof(src_address_buffer));
 							inet_ntop(af_type,(void*)&ipv4->ip_dst,dst_address_buffer,sizeof(dst_address_buffer));
 							fprintf(log_fd, "\"ipv4_src\": \"%s\", ", src_address_buffer);
@@ -646,7 +646,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 							 * scenarios, however the "ip_version" field makes it clear that this is an encapsulted
 							 * tunnel.
 							 */
-							fprintf(log_fd, "6in4\", ");
+							fprintf(log_fd, "\"6in4\", ");
 							inet_ntop(af_type,(void*)&ipv4->ip_src,src_address_buffer,sizeof(src_address_buffer));
 							inet_ntop(af_type,(void*)&ipv4->ip_dst,dst_address_buffer,sizeof(dst_address_buffer));
 							fprintf(log_fd, "\"ipv4_src\": \"%s\", ", src_address_buffer);

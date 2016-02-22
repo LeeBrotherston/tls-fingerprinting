@@ -27,13 +27,13 @@ while 1:
 			print jline["timestamp"]+" \"\033[1;36m"+jline["fingerprint_desc"]+"\033[1;m\" "+jline["tls_version"]+" connection to \""\
 			+"\033[1;33m"+jline["server_name"]+"\033[1;m\" ",
 
-			if(jline["ip_version"] == "ipv4")
+			if(jline["ip_version"] == "ipv4"):
 				print jline["ipv4_src"]+":"+str(jline["src_port"])+" -> "+jline["ipv4_dst"]+":"+str(jline["dst_port"])+" ",
-			if(jline["ip_version"] == "ipv6")
+			if(jline["ip_version"] == "ipv6"):
 				print jline["ipv6_src"]+":"+str(jline["src_port"])+" -> "+jline["ipv6_dst"]+":"+str(jline["dst_port"])+" ",
-			if(jline["ip_version"] == "6in4")
+			if(jline["ip_version"] == "6in4"):
 				print jline["ipv4_src"]+"("+jline["ipv6_src"]+":"+str(jline["src_port"])+") -> "+jline["ipv4_dst"]+"("+jline["ipv6_dst"]+":"+str(jline["dst_port"])+") ",
-			if(jline["ip_version"] == "teredo")
+			if(jline["ip_version"] == "teredo"):
 				print jline["ipv4_src"]+"("+jline["ipv6_src"]+":"+str(jline["src_port"])+") -> "+jline["ipv4_dst"]+"("+jline["ipv6_dst"]+":"+str(jline["dst_port"])+") ",
 
 

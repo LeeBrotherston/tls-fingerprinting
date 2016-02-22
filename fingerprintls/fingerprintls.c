@@ -73,7 +73,8 @@ void print_usage(char *bin_name) {
 	fprintf(stderr, "    -p <pcap file>    Read packets from specified pcap file\n");
 //	fprintf(stderr, "    -P <pcap file>    Save packets to specified pcap file for unknown fingerprints\n");
 	fprintf(stderr, "    -j <json file>    Output JSON fingerprints\n");
-	fprintf(stderr, "    -s                Output JSON signatures of unknown connections to stdout\n");
+	fprintf(stderr, "    -l <log file>     Output logfile (JSON format)\n");
+//	fprintf(stderr, "    -s                Output JSON signatures of unknown connections to stdout\n");  // Comment this out as I'm trying to deprecate this
 	fprintf(stderr, "    -d                Show reasons for discarded packets (post BPF)\n");
 	fprintf(stderr, "    -f <fpdb>         Load the (binary) FingerPrint Database\n");
 	fprintf(stderr, "    -u <uid>          Drop privileges to specified UID (not username)\n");
@@ -98,7 +99,7 @@ int main(int argc, char **argv) {
 	int arg_start = 1, i;
 	extern struct bpf_program fp;					/* compiled filter program (expression) */
 
-	extern FILE *json_fd, *fpdb_fd;
+	extern FILE *json_fd, *fpdb_fd, *log_fd;
 	int filesize;
 	uint8_t *fpdb_raw = NULL;
 	int	fp_count = 0;
@@ -108,7 +109,8 @@ int main(int argc, char **argv) {
 
 
 	/* Make sure pipe sees new packets unbuffered. */
-	setvbuf(stdout, (char *)NULL, _IOLBF, 0);
+	//setvbuf(stdout, (char *)NULL, _IOLBF, 0);
+	setlinebuf(stdout);
 
 	if (argc == 1) {
 		print_usage(argv[0]);
@@ -154,7 +156,7 @@ int main(int argc, char **argv) {
 					exit(-1);
 				}
 				handle = pcap_open_live(argv[++i], SNAP_LEN, 1, 1000, errbuf);
-				printf("Using interface: %s\n", argv[i]);
+				printf("Using interface: \033[1;36m%s\033[1;m\n", argv[i]);
 				break;
 			case 'j':
 				/* JSON output to file */
@@ -162,7 +164,17 @@ int main(int argc, char **argv) {
 					printf("Cannot open JSON file for output\n");
 					exit(-1);
 				}
-				setvbuf(json_fd, (char *)NULL, _IOLBF, 0);
+				// Buffering is fine, but linebuf needed for tailers to work properly
+				setlinebuf(json_fd);
+				break;
+			case 'l':
+				/* Output to log file */
+				if((log_fd = fopen(argv[++i], "a")) == NULL) {
+					printf("Cannot open log file for output\n");
+					exit(-1);
+				}
+				// Buffering is fine, but linebuf needed for tailers to work properly
+				setlinebuf(log_fd);
 				break;
 			case 's':
 				/* JSON output to stdout */

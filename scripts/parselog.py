@@ -24,8 +24,8 @@ while 1:
 
 		# Actually outputting things here....
 		if(jline["event"] == 'fingerprint_match'):
-			print jline["timestamp"]+" \""+jline["fingerprint_desc"]+"\" "+jline["tls_version"]+" connection to \""\
-			+jline["server_name"]+"\" "+jline["ipv4_src"]+":"+str(jline["src_port"])+" -> "+jline["ipv4_dst"]+":"\
+			print jline["timestamp"]+" \"\033[1;36m"+jline["fingerprint_desc"]+"\033[1;m\" "+jline["tls_version"]+" connection to \""\
+			+"\033[1;33m"+jline["server_name"]+"\033[1;m\" "+jline["ipv4_src"]+":"+str(jline["src_port"])+" -> "+jline["ipv4_dst"]+":"\
 			+str(jline["dst_port"])+" "
 
 

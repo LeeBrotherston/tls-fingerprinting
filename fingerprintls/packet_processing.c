@@ -39,6 +39,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		struct fingerprint_new *fp_nav;			/* For navigating the fingerprint database */
 		static struct fingerprint_new *fp_packet = NULL;			/* Generated fingerprint for incoming packet */
 		static uint16_t	extensions_malloc = 0;							/* how much is currently allocated for the extensions field */
+		extern pcap_dumper_t *output_handle;					/* output to pcap handle */
 
 		/* pointers to key places in the packet headers */
 		struct ether_header *ethernet;	/* The ethernet header [1] */
@@ -565,6 +566,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 
 					/* Whole criteria match.... woo! */
 					matchcount++;
+					/*
 					fprintf(stdout, "[%s] Fingerprint Matched: \"%.*s\" %s connection from %s:%i to ", printable_time, fp_nav->desc_length ,fp_nav->desc, ssl_version(fp_nav->tls_version),
 						src_address_buffer, ntohs(tcp->th_sport));
 					fprintf(stdout, "%s:%i ", dst_address_buffer, ntohs(tcp->th_dport));
@@ -579,12 +581,102 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 					}
 					fprintf(stdout, "\"");
 					if(matchcount > 1)
-						/* This shouldn't happen, but is useful to debug duplicate fingerprints */
-
-						/* May disable this for speed optimisation (or make it configurable) */
-
 						fprintf(stdout, "(Multiple Match)");
 					fprintf(stdout, "\n");
+					*/
+					/*
+					 * New output format.  JSON to allow easier automated parsing.
+					 */
+					 fprintf(stdout, "{ "); // May need more header to define type?
+					 fprintf(stdout, "\"timestamp\": \"%s\", ", printable_time);
+					 fprintf(stdout, "\"event\": \"fingerprint_match\", ");
+
+					 fprintf(stdout, "\"ip_version\": ");
+					 switch(ip_version) {
+						 case 4:
+						 	/* IPv4 */
+							fprintf(stdout, "\"ipv4\", ");
+							inet_ntop(af_type,(void*)&ipv4->ip_src,src_address_buffer,sizeof(src_address_buffer));
+							inet_ntop(af_type,(void*)&ipv4->ip_dst,dst_address_buffer,sizeof(dst_address_buffer));
+							fprintf(stdout, "\"ipv4_src\": \"%s\", ", src_address_buffer);
+							fprintf(stdout, "\"ipv4_dst\": \"%s\", ", dst_address_buffer);
+
+							fprintf(stdout, "\"src_port\": %hu, ", ntohs(tcp->th_sport));
+							fprintf(stdout, "\"dst_port\": %hu, ", ntohs(tcp->th_dport));
+
+							break;
+						 case 6:
+						 	/* IPv6 */
+							fprintf(stdout, "ipv6\", ");
+							inet_ntop(af_type,(void*)&ipv6->ip6_src,src_address_buffer,sizeof(src_address_buffer));
+							inet_ntop(af_type,(void*)&ipv6->ip6_dst,dst_address_buffer,sizeof(dst_address_buffer));
+							fprintf(stdout, "\"ipv6_src\": \"%s\", ", src_address_buffer);
+							fprintf(stdout, "\"ipv6_dst\": \"%s\", ", dst_address_buffer);
+
+							fprintf(stdout, "\"src_port\": %hu, ", ntohs(tcp->th_sport));
+							fprintf(stdout, "\"dst_port\": %hu, ", ntohs(tcp->th_dport));
+							break;
+						 case 7:
+						 	/*
+							 * Teredo.  As this is an IPv6 within IPv4 tunnel, both sets of address are logged.
+							 * The field names remain the same for ease of reporting on "all traffic from X" type
+							 * scenarios, however the "ip_version" field makes it clear that this is an encapsulted
+							 * tunnel.
+							 */
+							fprintf(stdout, "teredo\", ");
+							inet_ntop(af_type,(void*)&ipv4->ip_src,src_address_buffer,sizeof(src_address_buffer));
+							inet_ntop(af_type,(void*)&ipv4->ip_dst,dst_address_buffer,sizeof(dst_address_buffer));
+							fprintf(stdout, "\"ipv4_src\": \"%s\", ", src_address_buffer);
+							fprintf(stdout, "\"ipv4_dst\": \"%s\", ", dst_address_buffer);
+							inet_ntop(af_type,(void*)&ipv6->ip6_src,src_address_buffer,sizeof(src_address_buffer));
+							inet_ntop(af_type,(void*)&ipv6->ip6_dst,dst_address_buffer,sizeof(dst_address_buffer));
+							fprintf(stdout, "\"ipv6_src\": \"%s\", ", src_address_buffer);
+							fprintf(stdout, "\"ipv6_dst\": \"%s\", ", dst_address_buffer);
+
+							fprintf(stdout, "\"src_port\": %hu, ", ntohs(tcp->th_sport));
+							fprintf(stdout, "\"dst_port\": %hu, ", ntohs(tcp->th_dport));
+
+							/* Add in ports of the outer Teredo tunnel? */
+
+							break;
+						 case 8:
+						 	/*
+							 * 6in4. 	As this is an IPv6 within IPv4 tunnel, both sets of address are logged.
+							 * The field names remain the same for ease of reporting on "all traffic from X" type
+							 * scenarios, however the "ip_version" field makes it clear that this is an encapsulted
+							 * tunnel.
+							 */
+							fprintf(stdout, "6in4\", ");
+							inet_ntop(af_type,(void*)&ipv4->ip_src,src_address_buffer,sizeof(src_address_buffer));
+							inet_ntop(af_type,(void*)&ipv4->ip_dst,dst_address_buffer,sizeof(dst_address_buffer));
+							fprintf(stdout, "\"ipv4_src\": \"%s\", ", src_address_buffer);
+							fprintf(stdout, "\"ipv4_dst\": \"%s\", ", dst_address_buffer);
+							inet_ntop(af_type,(void*)&ipv6->ip6_src,src_address_buffer,sizeof(src_address_buffer));
+							inet_ntop(af_type,(void*)&ipv6->ip6_dst,dst_address_buffer,sizeof(dst_address_buffer));
+							fprintf(stdout, "\"ipv6_src\": \"%s\", ", src_address_buffer);
+							fprintf(stdout, "\"ipv6_dst\": \"%s\", ", dst_address_buffer);
+
+							fprintf(stdout, "\"src_port\": %hu, ", ntohs(tcp->th_sport));
+							fprintf(stdout, "\"dst_port\": %hu, ", ntohs(tcp->th_dport));
+							break;
+					 }
+
+					 fprintf(stdout, "\"tls_version\": \"%s\", ", ssl_version(fp_nav->tls_version));
+					 fprintf(stdout, "\"fingerprint_desc\": \"%.*s\", ", fp_nav->desc_length, fp_nav->desc);
+
+					 fprintf(stdout, "\"server_name\": \"");
+					 if(server_name != NULL) {
+ 						for (arse = 7 ; arse <= (server_name[0]*256 + server_name[1]) + 1 ; arse++) {
+ 							if (server_name[arse] > 0x20 && server_name[arse] < 0x7b)
+ 								fprintf(stdout, "%c", server_name[arse]);
+ 						}
+						fprintf(stdout, "\"");
+ 					} else {
+ 						fprintf(stdout, "\"");
+ 					}
+
+					fprintf(stdout, " }\n");
+
 			} else {
 				// Fuzzy Match goes here (if we ever want it)
 
@@ -596,6 +688,13 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 
 
 		if(matchcount == 0) {
+			/* Write to unknown fingerprint pcap file (if opened already) */
+//			if(output_handle != NULL) {
+				//pcap_dump(output_handle, pcap_header, packet);
+//			}
+
+
+
 			/*
 				OK, we're setting up a signature, let's  actually do some memory fun
 			*/

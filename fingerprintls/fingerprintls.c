@@ -92,7 +92,7 @@ int main(int argc, char **argv) {
 	char *unpriv_user = NULL;							/* User for dropping privs */
 	char errbuf[PCAP_ERRBUF_SIZE];				/* error buffer */
 	extern pcap_t *handle;								/* packet capture handle */
-	extern pcap_t *output_handle;					/* output to pcap handle */
+//	extern pcap_dumper_t *output_handle;					/* output to pcap handle */
 
 	char *filter_exp = default_filter;
 	int arg_start = 1, i;
@@ -133,9 +133,18 @@ int main(int argc, char **argv) {
 				printf("Reading from file: %s\n", argv[i]);
 				break;
 			case 'P':
-				/* Open the file */
-				handle = pcap_open_offline(argv[++i], errbuf);
-				printf("Reading from file: %s\n", argv[i]);
+				/* Open existing file to append */
+//				output_handle = pcap_dump_open_append(argv[++i], errbuf);
+				/* That failed, try creating a new one */
+//				if(output_handle == NULL) {
+//					output_handle = pcap_dump_open(argv[i], errbuf);
+//				}
+//				if(output_handle == NULL) {
+//					printf("Problem writing output pcap: %s\n", errbuf);
+//					exit (-1);
+//				} else {
+//					printf("Writing samples to file: %s\n", argv[i]);
+//				}
 				break;
 			case 'i':
 				/* Open the interface */

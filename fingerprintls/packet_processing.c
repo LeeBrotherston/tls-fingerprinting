@@ -187,14 +187,6 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 						/* Not using this yet, but here ready for when I impliment 6in4 de-encapsultion (per teredo) */
 						ip_version = 8;  // No reason... YOLO
 						ipv6 = (struct ip6_hdr*)(packet + SIZE_ETHERNET + size_vlan_offset + sizeof(struct ipv4_header));
-
-						// OK This works ok
-						//inet_ntop(AF_INET,(void*)&ipv4->ip_src,src_address_buffer,sizeof(src_address_buffer));
-						//inet_ntop(AF_INET6,(void*)&ipv6->ip6_dst,dst_address_buffer,sizeof(dst_address_buffer));
-						//printf("6in4: %s -> %s\n", src_address_buffer, dst_address_buffer);
-
-						/* used later to get tcp offsets */
-						//size_ip += sizeof(struct ip6_hdr);
 						size_ip += 40;
 						break;
 
@@ -227,10 +219,6 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 				// XXX These lines are duplicated, will de-dupe later this is for testing without breaking :)
 				tcp = (struct tcp_header*)(packet + SIZE_ETHERNET + size_vlan_offset + size_ip);
 				payload = (u_char *)(packet + SIZE_ETHERNET + size_vlan_offset + size_ip + (tcp->th_off * 4));
-				// Emulating: "(tcp[tcp[12]/16*4]=22 and (tcp[tcp[12]/16*4+5]=1) and (tcp[tcp[12]/16*4+9]=3) and (tcp[tcp[12]/16*4+1]=3))"
-				//if(!(payload[0] == 22 && payload[5] == 1 && payload[9] == 3 && payload[1] == 3))
-					return; /* Doesn't match our not BPF, BPF.... BAILING OUT!! */
-
 
 				/* Sanity Check... Should be IPv6 */
 				if ((ntohl(ipv6->ip6_vfc)>>28)!=6){

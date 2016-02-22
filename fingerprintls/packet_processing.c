@@ -15,7 +15,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		/* Variables, gotta have variables, and structs and pointers....  and things */
 		/* ************************************************************************* */
 
-		extern FILE *json_fd;
+		extern FILE *json_fd, *log_fd;
 		extern int newsig_count;
 		extern char hostname[HOST_NAME_MAX];
 
@@ -587,34 +587,34 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 					/*
 					 * New output format.  JSON to allow easier automated parsing.
 					 */
-					 fprintf(stdout, "{ "); // May need more header to define type?
-					 fprintf(stdout, "\"timestamp\": \"%s\", ", printable_time);
-					 fprintf(stdout, "\"event\": \"fingerprint_match\", ");
+					 fprintf(log_fd, "{ "); // May need more header to define type?
+					 fprintf(log_fd, "\"timestamp\": \"%s\", ", printable_time);
+					 fprintf(log_fd, "\"event\": \"fingerprint_match\", ");
 
-					 fprintf(stdout, "\"ip_version\": ");
+					 fprintf(log_fd, "\"ip_version\": ");
 					 switch(ip_version) {
 						 case 4:
 						 	/* IPv4 */
-							fprintf(stdout, "\"ipv4\", ");
+							fprintf(log_fd, "\"ipv4\", ");
 							inet_ntop(af_type,(void*)&ipv4->ip_src,src_address_buffer,sizeof(src_address_buffer));
 							inet_ntop(af_type,(void*)&ipv4->ip_dst,dst_address_buffer,sizeof(dst_address_buffer));
-							fprintf(stdout, "\"ipv4_src\": \"%s\", ", src_address_buffer);
-							fprintf(stdout, "\"ipv4_dst\": \"%s\", ", dst_address_buffer);
+							fprintf(log_fd, "\"ipv4_src\": \"%s\", ", src_address_buffer);
+							fprintf(log_fd, "\"ipv4_dst\": \"%s\", ", dst_address_buffer);
 
-							fprintf(stdout, "\"src_port\": %hu, ", ntohs(tcp->th_sport));
-							fprintf(stdout, "\"dst_port\": %hu, ", ntohs(tcp->th_dport));
+							fprintf(log_fd, "\"src_port\": %hu, ", ntohs(tcp->th_sport));
+							fprintf(log_fd, "\"dst_port\": %hu, ", ntohs(tcp->th_dport));
 
 							break;
 						 case 6:
 						 	/* IPv6 */
-							fprintf(stdout, "ipv6\", ");
+							fprintf(log_fd, "ipv6\", ");
 							inet_ntop(af_type,(void*)&ipv6->ip6_src,src_address_buffer,sizeof(src_address_buffer));
 							inet_ntop(af_type,(void*)&ipv6->ip6_dst,dst_address_buffer,sizeof(dst_address_buffer));
-							fprintf(stdout, "\"ipv6_src\": \"%s\", ", src_address_buffer);
-							fprintf(stdout, "\"ipv6_dst\": \"%s\", ", dst_address_buffer);
+							fprintf(log_fd, "\"ipv6_src\": \"%s\", ", src_address_buffer);
+							fprintf(log_fd, "\"ipv6_dst\": \"%s\", ", dst_address_buffer);
 
-							fprintf(stdout, "\"src_port\": %hu, ", ntohs(tcp->th_sport));
-							fprintf(stdout, "\"dst_port\": %hu, ", ntohs(tcp->th_dport));
+							fprintf(log_fd, "\"src_port\": %hu, ", ntohs(tcp->th_sport));
+							fprintf(log_fd, "\"dst_port\": %hu, ", ntohs(tcp->th_dport));
 							break;
 						 case 7:
 						 	/*
@@ -623,18 +623,18 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 							 * scenarios, however the "ip_version" field makes it clear that this is an encapsulted
 							 * tunnel.
 							 */
-							fprintf(stdout, "teredo\", ");
+							fprintf(log_fd, "teredo\", ");
 							inet_ntop(af_type,(void*)&ipv4->ip_src,src_address_buffer,sizeof(src_address_buffer));
 							inet_ntop(af_type,(void*)&ipv4->ip_dst,dst_address_buffer,sizeof(dst_address_buffer));
-							fprintf(stdout, "\"ipv4_src\": \"%s\", ", src_address_buffer);
-							fprintf(stdout, "\"ipv4_dst\": \"%s\", ", dst_address_buffer);
+							fprintf(log_fd, "\"ipv4_src\": \"%s\", ", src_address_buffer);
+							fprintf(log_fd, "\"ipv4_dst\": \"%s\", ", dst_address_buffer);
 							inet_ntop(af_type,(void*)&ipv6->ip6_src,src_address_buffer,sizeof(src_address_buffer));
 							inet_ntop(af_type,(void*)&ipv6->ip6_dst,dst_address_buffer,sizeof(dst_address_buffer));
-							fprintf(stdout, "\"ipv6_src\": \"%s\", ", src_address_buffer);
-							fprintf(stdout, "\"ipv6_dst\": \"%s\", ", dst_address_buffer);
+							fprintf(log_fd, "\"ipv6_src\": \"%s\", ", src_address_buffer);
+							fprintf(log_fd, "\"ipv6_dst\": \"%s\", ", dst_address_buffer);
 
-							fprintf(stdout, "\"src_port\": %hu, ", ntohs(tcp->th_sport));
-							fprintf(stdout, "\"dst_port\": %hu, ", ntohs(tcp->th_dport));
+							fprintf(log_fd, "\"src_port\": %hu, ", ntohs(tcp->th_sport));
+							fprintf(log_fd, "\"dst_port\": %hu, ", ntohs(tcp->th_dport));
 
 							/* Add in ports of the outer Teredo tunnel? */
 
@@ -646,36 +646,34 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 							 * scenarios, however the "ip_version" field makes it clear that this is an encapsulted
 							 * tunnel.
 							 */
-							fprintf(stdout, "6in4\", ");
+							fprintf(log_fd, "6in4\", ");
 							inet_ntop(af_type,(void*)&ipv4->ip_src,src_address_buffer,sizeof(src_address_buffer));
 							inet_ntop(af_type,(void*)&ipv4->ip_dst,dst_address_buffer,sizeof(dst_address_buffer));
-							fprintf(stdout, "\"ipv4_src\": \"%s\", ", src_address_buffer);
-							fprintf(stdout, "\"ipv4_dst\": \"%s\", ", dst_address_buffer);
+							fprintf(log_fd, "\"ipv4_src\": \"%s\", ", src_address_buffer);
+							fprintf(log_fd, "\"ipv4_dst\": \"%s\", ", dst_address_buffer);
 							inet_ntop(af_type,(void*)&ipv6->ip6_src,src_address_buffer,sizeof(src_address_buffer));
 							inet_ntop(af_type,(void*)&ipv6->ip6_dst,dst_address_buffer,sizeof(dst_address_buffer));
-							fprintf(stdout, "\"ipv6_src\": \"%s\", ", src_address_buffer);
-							fprintf(stdout, "\"ipv6_dst\": \"%s\", ", dst_address_buffer);
+							fprintf(log_fd, "\"ipv6_src\": \"%s\", ", src_address_buffer);
+							fprintf(log_fd, "\"ipv6_dst\": \"%s\", ", dst_address_buffer);
 
-							fprintf(stdout, "\"src_port\": %hu, ", ntohs(tcp->th_sport));
-							fprintf(stdout, "\"dst_port\": %hu, ", ntohs(tcp->th_dport));
+							fprintf(log_fd, "\"src_port\": %hu, ", ntohs(tcp->th_sport));
+							fprintf(log_fd, "\"dst_port\": %hu, ", ntohs(tcp->th_dport));
 							break;
 					 }
 
-					 fprintf(stdout, "\"tls_version\": \"%s\", ", ssl_version(fp_nav->tls_version));
-					 fprintf(stdout, "\"fingerprint_desc\": \"%.*s\", ", fp_nav->desc_length, fp_nav->desc);
+					 fprintf(log_fd, "\"tls_version\": \"%s\", ", ssl_version(fp_nav->tls_version));
+					 fprintf(log_fd, "\"fingerprint_desc\": \"%.*s\", ", fp_nav->desc_length, fp_nav->desc);
 
-					 fprintf(stdout, "\"server_name\": \"");
+					 fprintf(log_fd, "\"server_name\": \"");
+
 					 if(server_name != NULL) {
  						for (arse = 7 ; arse <= (server_name[0]*256 + server_name[1]) + 1 ; arse++) {
  							if (server_name[arse] > 0x20 && server_name[arse] < 0x7b)
- 								fprintf(stdout, "%c", server_name[arse]);
+ 								fprintf(log_fd, "%c", server_name[arse]);
  						}
-						fprintf(stdout, "\"");
- 					} else {
- 						fprintf(stdout, "\"");
  					}
 
-					fprintf(stdout, " }\n");
+					fprintf(log_fd, "\" }\n");
 
 			} else {
 				// Fuzzy Match goes here (if we ever want it)

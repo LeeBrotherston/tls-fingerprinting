@@ -61,6 +61,8 @@ mistakes, kthnxbai.
 /* Stuff to process packets */
 #include "packet_processing.c"
 
+/* For domain socket */
+#include <sys/socket.h>
 
 /*
  * print help text
@@ -134,8 +136,14 @@ int main(int argc, char **argv) {
 				break;
 			case 'P':
 				/* Open the file */
-				handle = pcap_open_offline(argv[++i], errbuf);
-				printf("Reading from file: %s\n", argv[i]);
+				//output_handle = pcap_open_offline(argv[++i], errbuf);
+				output_handle = pcap_dump_open(pcap_open_dead(DLT_EN10MB, 65535), argv[++i]);
+				if (output_handle != NULL) {
+					printf("Writing samples to file: %s\n", argv[i]);
+				} else {
+					printf("Could not save samples: %s\n", errbuf);
+					exit(-1);
+				}
 				break;
 			case 'i':
 				/* Open the interface */

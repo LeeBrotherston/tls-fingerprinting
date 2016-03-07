@@ -207,6 +207,7 @@ char *default_filter = "(tcp[tcp[12]/16*4]=22 and (tcp[tcp[12]/16*4+5]=1) and (t
 
 */
 
+
 /* --------- */
 /* Externals */
 /* --------- */
@@ -216,7 +217,7 @@ FILE *json_fd = NULL;
 FILE *fpdb_fd = NULL;
 struct fingerprint_new *search[8][4];
 char hostname[HOST_NAME_MAX];			/* store the hostname once to save multiple lookups */
-
+char *domain_socket = "/var/run/fingerprintls.socket";
 
 /* These were in main, but this let's the signal handler close as needed */
 pcap_t *handle = NULL;						/* packet capture handle */

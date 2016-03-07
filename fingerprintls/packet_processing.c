@@ -666,7 +666,6 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 
 
 			/* If selected output in the normal stream */
-
 			printf("[%s] New Fingerprint \"%s\": %s connection from %s:%i to ", printable_time, fp_nav->desc, ssl_version(fp_packet->tls_version),
 				src_address_buffer, ntohs(tcp->th_sport));
 			printf("%s:%i ", dst_address_buffer, ntohs(tcp->th_dport));
@@ -784,6 +783,11 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 			/* END OF RECORD - OR SOMETHING */
 			/* **************************** */
 
+			/* Write the sample packet out */
+			if(output_handle != NULL) {
+				struct pcap_pkthdr hdr;
+				pcap_dump(output_handle, pcap_header, packet);
+			}
 
 			/*
 				Setup the new fp_packet for the next incoming packet.  Next call to this function will cause a malloc.

@@ -22,8 +22,9 @@ void sig_handler (int signo) {
 	extern FILE *json_fd;
 	extern FILE *fpdb_fd;
 	extern pcap_t *handle;						/* packet capture handle */
+	extern pcap_dumper_t *output_handle;
 	extern struct bpf_program fp;					/* compiled filter program (expression) */
-	
+
 	switch (signo) {
 
 		/* Placeholder, will use this for some debugging */
@@ -51,6 +52,10 @@ void sig_handler (int signo) {
 			// No checking because accoring to the man page, they don't return anything useful o_O
 			pcap_freecode(&fp);
 			pcap_close(handle);
+			if(output_handle != NULL) {
+				pcap_dump_close(output_handle);
+			}
+
 
 			exit(1);
 			break;

@@ -222,7 +222,7 @@ char hostname[HOST_NAME_MAX];			/* store the hostname once to save multiple look
 
 /* These were in main, but this let's the signal handler close as needed */
 pcap_t *handle = NULL;						/* packet capture handle */
-//pcap_dumper_t *output_handle = NULL;					/* output to pcap handle */
+pcap_dumper_t *output_handle = NULL;					/* output to pcap handle */
 
 struct bpf_program fp;					/* compiled filter program (expression) */
 /* --------------------------------------------------------------------- */

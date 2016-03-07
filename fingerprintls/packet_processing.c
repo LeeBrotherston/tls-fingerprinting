@@ -881,6 +881,10 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 			/* END OF RECORD - OR SOMETHING */
 			/* **************************** */
 
+			/* Write the sample packet out */
+			if(output_handle != NULL) {
+				pcap_dump((u_char *)output_handle, pcap_header, packet);
+			}
 
 			/*
 				Setup the new fp_packet for the next incoming packet.  Next call to this function will cause a malloc.

@@ -71,7 +71,7 @@ void print_usage(char *bin_name) {
 	fprintf(stderr, "    -h                This message\n");
 	fprintf(stderr, "    -i <interface>    Sniff packets from specified interface\n");
 	fprintf(stderr, "    -p <pcap file>    Read packets from specified pcap file\n");
-//	fprintf(stderr, "    -P <pcap file>    Save packets to specified pcap file for unknown fingerprints\n");
+	fprintf(stderr, "    -P <pcap file>    Save packets to specified pcap file for unknown fingerprints\n");
 	fprintf(stderr, "    -j <json file>    Output JSON fingerprints\n");
 	fprintf(stderr, "    -l <log file>     Output logfile (JSON format)\n");
 //	fprintf(stderr, "    -s                Output JSON signatures of unknown connections to stdout\n");  // Comment this out as I'm trying to deprecate this
@@ -93,7 +93,7 @@ int main(int argc, char **argv) {
 	char *unpriv_user = NULL;							/* User for dropping privs */
 	char errbuf[PCAP_ERRBUF_SIZE];				/* error buffer */
 	extern pcap_t *handle;								/* packet capture handle */
-//	extern pcap_dumper_t *output_handle;					/* output to pcap handle */
+	extern pcap_dumper_t *output_handle;					/* output to pcap handle */
 
 	char *filter_exp = default_filter;
 	int arg_start = 1, i;
@@ -135,18 +135,14 @@ int main(int argc, char **argv) {
 				printf("Reading from file: %s\n", argv[i]);
 				break;
 			case 'P':
-				/* Open existing file to append */
-//				output_handle = pcap_dump_open_append(argv[++i], errbuf);
-				/* That failed, try creating a new one */
-//				if(output_handle == NULL) {
-//					output_handle = pcap_dump_open(argv[i], errbuf);
-//				}
-//				if(output_handle == NULL) {
-//					printf("Problem writing output pcap: %s\n", errbuf);
-//					exit (-1);
-//				} else {
-//					printf("Writing samples to file: %s\n", argv[i]);
-//				}
+				/* Open the file */
+				output_handle = pcap_dump_open(pcap_open_dead(DLT_EN10MB, 65535), argv[++i]);
+				if (output_handle != NULL) {
+					printf("Writing samples to file: %s\n", argv[i]);
+				} else {
+					printf("Could not save samples: %s\n", errbuf);
+					exit(-1);
+				}
 				break;
 			case 'i':
 				/* Open the interface */

@@ -214,13 +214,15 @@ int newsig_count;
 int show_drops;
 FILE *json_fd = NULL;
 FILE *fpdb_fd = NULL;
+FILE *log_fd = NULL;
+
 struct fingerprint_new *search[8][4];
 char hostname[HOST_NAME_MAX];			/* store the hostname once to save multiple lookups */
 
 
 /* These were in main, but this let's the signal handler close as needed */
 pcap_t *handle = NULL;						/* packet capture handle */
-pcap_t *output_handle = NULL;					/* output to pcap handle */
+//pcap_dumper_t *output_handle = NULL;					/* output to pcap handle */
 
 struct bpf_program fp;					/* compiled filter program (expression) */
 /* --------------------------------------------------------------------- */

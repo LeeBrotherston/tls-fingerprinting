@@ -27,8 +27,6 @@ mistakes, kthnxbai.
 // TODO
 // XXX Add UDP support (not as easy as I thought, DTLS has differences... still add it though)
 // XXX enhance search to include sorting per list/thread/shard/thingy
-// XXX add 6in4 support (should be as simple as UDP and IPv6... in theory)
-// XXX add Teredo support
 
 
 

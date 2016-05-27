@@ -239,6 +239,10 @@ int main(int argc, char **argv) {
 		exit(0);
 	}
 
+	/* If log_fd isn't set we can just print to stdout */
+	if(log_fd == NULL) {
+		log_fd = stdout;
+	}
 
 	/* XXX Temporary home, but need to test as early in the cycle as possible for now */
 	/* Load binary rules blob and parse */

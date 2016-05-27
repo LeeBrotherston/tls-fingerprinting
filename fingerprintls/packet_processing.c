@@ -569,7 +569,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 			fp_packet->extensions[unarse] = (uint8_t) extensions_tmp_ptr[arse];
 			fp_packet->extensions[unarse+1] = (uint8_t) extensions_tmp_ptr[arse+1];
 			unarse += 2;
-			arse = arse + 4 + (uint8_t)(extensions_tmp_ptr[(arse+2)]*256) + (uint8_t)(extensions_tmp_ptr[arse+3]);
+			arse = arse + 4 + (((uint8_t) extensions_tmp_ptr[(arse+2)])*256) + (uint8_t)(extensions_tmp_ptr[arse+3]);
 		}
 
 		/* ********************************************* */

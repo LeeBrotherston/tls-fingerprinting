@@ -46,7 +46,6 @@ int register_signals() {
 void sig_handler (int signo) {
 	struct pcap_stat pstats;
 	extern FILE *json_fd;
-	extern FILE *fpdb_fd;
 	extern pcap_t *handle;						/* packet capture handle */
 	extern pcap_dumper_t *output_handle;
 	extern struct bpf_program fp;					/* compiled filter program (expression) */
@@ -60,13 +59,6 @@ void sig_handler (int signo) {
 
 		/* Someone has ctrl-c'd the process.... deal */
 		case SIGINT:
-			// Close File Pointers
-			// Not even going to check, because, APP GOING DOWN!!
-			fclose(json_fd);
-			fclose(fpdb_fd);
-
-			// Sort out libpcap stuff
-
 			// Get some stats on the session
 			if(!(pcap_stats(handle, &pstats))) {
 				printf("Processed %i%% Of Packets\n",
@@ -74,6 +66,12 @@ void sig_handler (int signo) {
 				printf("Recieved: %i\n", pstats.ps_recv);
 				printf("Dropped: %i\n", pstats.ps_drop);
 			}
+
+			/* Stop the pcap loop */
+			pcap_breakloop(handle);
+
+			// Close File Pointers
+			fclose(json_fd);
 
 			// No checking because accoring to the man page, they don't return anything useful o_O
 			pcap_freecode(&fp);
@@ -85,6 +83,10 @@ void sig_handler (int signo) {
 
 			exit(1);
 			break;
+
+		default:
+			printf("Caught signal: %i\n", signo);
+			exit(0);
 	}
 
 

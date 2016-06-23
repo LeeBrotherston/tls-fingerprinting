@@ -185,9 +185,6 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 						fprintf(stderr, "[%s] Packet Drop: Invalid IP header length: %u bytes\n", printable_time, size_ip);
 					return;
 				}
-				if(show_drops) {
-					fprintf(stderr, "[%s] Packet Passed header length: %u bytes\n", printable_time, size_ip);
-				}
 
 				/* Protocol */
 				switch(ipv4->ip_p) {
@@ -307,6 +304,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 			case 0x301:	/* TLSv1 */
 			case 0x302:	/* TLSv1.1 */
 			case 0x303:	/* TLSv1.2 */
+			case 0x304:	/* TLSv1.3 */
 				break;
 			default:
 				/* Doesn't look like a valid TLS version.... probably not even a TLS packet, if it is, it's a bad one */
@@ -322,6 +320,11 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 				printf("[%s] Packet Drop: Session ID looks bad [%i] [%i]\n", printable_time, size_payload, (OFFSET_SESSION_LENGTH + packet_data[0] + 3) );
 			return;
 		}
+
+		/* Temp measure to only capture first client hello... will move to pcap */
+		/* if(packet_data[0] > 0) { */
+		/* 	return; */
+		/* } */
 
 		/* ************************************************************************ */
 		/* The bit that grabs the useful info from packets (or sets pointers to it) */

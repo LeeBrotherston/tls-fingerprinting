@@ -140,6 +140,7 @@ char* ssl_version(u_short version) {
 		case 0x301: return "TLSv1.0";
 		case 0x302: return "TLSv1.1";
 		case 0x303: return "TLSv1.2";
+		case 0x304: return "TLSv1.3";
 	}
 	snprintf(hex, sizeof(hex), "0x%04hx", version);
 	return hex;

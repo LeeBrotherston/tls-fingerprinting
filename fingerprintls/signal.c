@@ -42,7 +42,7 @@ int register_signals() {
 }
 
 
-/* Handles a variety of signals being recieved */
+/* Handles a variety of signals being received */
 void sig_handler (int signo) {
 	struct pcap_stat pstats;
 	extern FILE *json_fd;
@@ -63,7 +63,7 @@ void sig_handler (int signo) {
 			if(!(pcap_stats(handle, &pstats))) {
 				printf("Processed %i%% Of Packets\n",
 					(int) (( (float)((float)pstats.ps_recv - (float)pstats.ps_drop) / (float) pstats.ps_recv) * 100) );
-				printf("Recieved: %i\n", pstats.ps_recv);
+				printf("Received: %i\n", pstats.ps_recv);
 				printf("Dropped: %i\n", pstats.ps_drop);
 			}
 

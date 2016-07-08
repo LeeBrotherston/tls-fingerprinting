@@ -72,6 +72,7 @@ void print_usage(char *bin_name) {
 	fprintf(stderr, "    -P <pcap file>    Save packets to specified pcap file for unknown fingerprints\n");
 	fprintf(stderr, "    -j <json file>    Output JSON fingerprints\n");
 	fprintf(stderr, "    -l <log file>     Output logfile (JSON format)\n");
+//	fprintf(stderr, "    -s                Output JSON signatures of unknown connections to stdout\n");  // Comment this out as I'm trying to deprecate this
 	fprintf(stderr, "    -d                Show reasons for discarded packets (post BPF)\n");
 	fprintf(stderr, "    -f <fpdb>         Load the (binary) FingerPrint Database\n");
 	fprintf(stderr, "    -u <uid>          Drop privileges to specified UID (not username)\n");

@@ -221,8 +221,13 @@ int main(int argc, char **argv) {
 	/* This should stay the first action as lowering privs reduces risk from any subsequent actions */
 	/* being poorly implimented and running as root */
 	if (unpriv_user != NULL) {
+		if (setgroups(0, NULL) == -1)
+			fprintf(stderr, "WARNING: could not set groups to 0 prior to dropping privileges\n");
+		} else {
+			fprintf(stderr, "Dropped effective group successfully\n");
+		}
 		if (setgid(getgid()) == -1) {
-  		fprintf(stderr, "WARNING: could not drop group privileges\n");
+  			fprintf(stderr, "WARNING: could not drop group privileges\n");
 		} else {
 			fprintf(stderr, "Dropped effective group successfully\n");
 		}

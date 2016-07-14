@@ -714,7 +714,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 					 fprintf(log_fd, "\"server_name\": \"");
 
 					 if(server_name != NULL) {
- 						for (arse = 7 ; arse <= (server_name[0]*256 + server_name[1]) + 1 ; arse++) {
+ 						for (arse = 7 ; arse <= (server_name[0]*256 + server_name[1]) - 5 ; arse++) {
  							if (server_name[arse] > 0x20 && server_name[arse] < 0x7b)
  								fprintf(log_fd, "%c", server_name[arse]);
  						}
@@ -816,7 +816,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 			printf("%s:%i ", dst_address_buffer, ntohs(tcp->th_dport));
 			printf("Servername: \"");
 			if(server_name != NULL) {
-				for (arse = 7 ; arse <= (server_name[0]*256 + server_name[1]) + 1 ; arse++) {
+				for (arse = 7 ; arse <= (server_name[0]*256 + server_name[1]) - 5 ; arse++) {
 					if (server_name[arse] > 0x20 && server_name[arse] < 0x7b)
 						printf("%c", server_name[arse]);
 				}
@@ -914,7 +914,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 
 			if(server_name != NULL) {
 				fprintf(json_fd, ", \"server_name\": \"");
-				for (arse = 7 ; arse <= (server_name[0]*256 + server_name[1]) + 1 ; arse++) {
+				for (arse = 7 ; arse <= (server_name[0]*256 + server_name[1]) - 5 ; arse++) {
 					if (server_name[arse] > 0x20 && server_name[arse] < 0x7b)
 						fprintf(json_fd, "%c", server_name[arse]);
 					else

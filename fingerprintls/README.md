@@ -7,7 +7,7 @@ FingerPrinTLS requires libpcap, which is included in most modern distributions. 
 This tool is tested on OS X, FreeBSD, and Linux; using GCC and Clang as compilers.  Current build status is: [![Build Status](https://travis-ci.org/LeeBrotherston/tls-fingerprinting.svg?branch=master)](https://travis-ci.org/LeeBrotherston/tls-fingerprinting)
 
 The commandline switches, as ridiculous as some of them are, are:
-
+```
 -h                Display help
 -i <interface>    Operate in live packetsniffing mode, capturing traffic from <interface>
 -p <pcap file>    Operate in filesystem mode, reading packets from specified pcap file
@@ -17,6 +17,6 @@ The commandline switches, as ridiculous as some of them are, are:
 -d                Show reasons for discarded packets (post BPF).  Typically this is because a packet is identified as malformed or not really TLS mid-processing.
 -f <fpdb>         Load the (binary) FingerPrint Database from the specified location
 -u <uid>          Drop privileges to specified UID (not username).  This allows the use of this tool without running as root (although it will need to be started as root in order to obtain permissions to sniff live interfaces)
-
+```
 [1]: https://blog.squarelemon.com/tls-fingerprinting/
 [2]: https://github.com/LeeBrotherston/tls-fingerprinting/tree/master/scripts

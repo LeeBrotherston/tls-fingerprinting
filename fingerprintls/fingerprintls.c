@@ -43,6 +43,7 @@ mistakes, kthnxbai.
 #include <unistd.h>
 #include <net/ethernet.h>
 #include <netinet/ip6.h>
+#include <grp.h>
 
 
 /* For TimeStamping from pcap_pkthdr */

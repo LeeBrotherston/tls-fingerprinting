@@ -43,6 +43,7 @@ mistakes, kthnxbai.
 #include <unistd.h>
 #include <net/ethernet.h>
 #include <netinet/ip6.h>
+#include <grp.h>
 
 /* To stop build errors for set-groups */
 #include <grp.h>

@@ -45,9 +45,6 @@ mistakes, kthnxbai.
 #include <netinet/ip6.h>
 #include <grp.h>
 
-/* To stop build errors for set-groups */
-#include <grp.h>
-
 /* For TimeStamping from pcap_pkthdr */
 #include <time.h>
 

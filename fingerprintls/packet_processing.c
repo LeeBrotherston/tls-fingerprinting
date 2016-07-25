@@ -618,95 +618,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 					/* Now print - irrespective of new or otherwise - we'll always have something :) */
 					/* **** */
 
-					 fprintf(log_fd, "{ "); // May need more header to define type?
-					 fprintf(log_fd, "\"timestamp\": \"%s\", ", printable_time);
-					 fprintf(log_fd, "\"event\": \"fingerprint_match\", ");
-
-					 fprintf(log_fd, "\"ip_version\": ");
-					 switch(ip_version) {
-						 case 4:
-							/* IPv4 */
-							fprintf(log_fd, "\"ipv4\", ");
-							inet_ntop(AF_INET,(void*)&ipv4->ip_src,src_address_buffer,sizeof(src_address_buffer));
-							inet_ntop(AF_INET,(void*)&ipv4->ip_dst,dst_address_buffer,sizeof(dst_address_buffer));
-							fprintf(log_fd, "\"ipv4_src\": \"%s\", ", src_address_buffer);
-							fprintf(log_fd, "\"ipv4_dst\": \"%s\", ", dst_address_buffer);
-
-							fprintf(log_fd, "\"src_port\": %hu, ", ntohs(tcp->th_sport));
-							fprintf(log_fd, "\"dst_port\": %hu, ", ntohs(tcp->th_dport));
-
-							break;
-						 case 6:
-							/* IPv6 */
-							fprintf(log_fd, "\"ipv6\", ");
-							inet_ntop(AF_INET6,(void*)&ipv6->ip6_src,src_address_buffer,sizeof(src_address_buffer));
-							inet_ntop(AF_INET6,(void*)&ipv6->ip6_dst,dst_address_buffer,sizeof(dst_address_buffer));
-							fprintf(log_fd, "\"ipv6_src\": \"%s\", ", src_address_buffer);
-							fprintf(log_fd, "\"ipv6_dst\": \"%s\", ", dst_address_buffer);
-
-							fprintf(log_fd, "\"src_port\": %hu, ", ntohs(tcp->th_sport));
-							fprintf(log_fd, "\"dst_port\": %hu, ", ntohs(tcp->th_dport));
-							break;
-						 case 7:
-							/*
-							 * Teredo.  As this is an IPv6 within IPv4 tunnel, both sets of address are logged.
-							 * The field names remain the same for ease of reporting on "all traffic from X" type
-							 * scenarios, however the "ip_version" field makes it clear that this is an encapsulted
-							 * tunnel.
-							 */
-							fprintf(log_fd, "\"teredo\", ");
-							inet_ntop(AF_INET,(void*)&ipv4->ip_src,src_address_buffer,sizeof(src_address_buffer));
-							inet_ntop(AF_INET,(void*)&ipv4->ip_dst,dst_address_buffer,sizeof(dst_address_buffer));
-							fprintf(log_fd, "\"ipv4_src\": \"%s\", ", src_address_buffer);
-							fprintf(log_fd, "\"ipv4_dst\": \"%s\", ", dst_address_buffer);
-							inet_ntop(AF_INET6,(void*)&ipv6->ip6_src,src_address_buffer,sizeof(src_address_buffer));
-							inet_ntop(AF_INET6,(void*)&ipv6->ip6_dst,dst_address_buffer,sizeof(dst_address_buffer));
-							fprintf(log_fd, "\"ipv6_src\": \"%s\", ", src_address_buffer);
-							fprintf(log_fd, "\"ipv6_dst\": \"%s\", ", dst_address_buffer);
-
-							fprintf(log_fd, "\"src_port\": %hu, ", ntohs(tcp->th_sport));
-							fprintf(log_fd, "\"dst_port\": %hu, ", ntohs(tcp->th_dport));
-
-							/* Add in ports of the outer Teredo tunnel? */
-
-							break;
-						 case 8:
-							/*
-							 * 6in4. 	As this is an IPv6 within IPv4 tunnel, both sets of address are logged.
-							 * The field names remain the same for ease of reporting on "all traffic from X" type
-							 * scenarios, however the "ip_version" field makes it clear that this is an encapsulted
-							 * tunnel.
-							 */
-							fprintf(log_fd, "\"6in4\", ");
-							inet_ntop(AF_INET,(void*)&ipv4->ip_src,src_address_buffer,sizeof(src_address_buffer));
-							inet_ntop(AF_INET,(void*)&ipv4->ip_dst,dst_address_buffer,sizeof(dst_address_buffer));
-							fprintf(log_fd, "\"ipv4_src\": \"%s\", ", src_address_buffer);
-							fprintf(log_fd, "\"ipv4_dst\": \"%s\", ", dst_address_buffer);
-							inet_ntop(AF_INET6,(void*)&ipv6->ip6_src,src_address_buffer,sizeof(src_address_buffer));
-							inet_ntop(AF_INET6,(void*)&ipv6->ip6_dst,dst_address_buffer,sizeof(dst_address_buffer));
-							fprintf(log_fd, "\"ipv6_src\": \"%s\", ", src_address_buffer);
-							fprintf(log_fd, "\"ipv6_dst\": \"%s\", ", dst_address_buffer);
-
-							fprintf(log_fd, "\"src_port\": %hu, ", ntohs(tcp->th_sport));
-							fprintf(log_fd, "\"dst_port\": %hu, ", ntohs(tcp->th_dport));
-							break;
-					 }
-
-					 fprintf(log_fd, "\"tls_version\": \"%s\", ", ssl_version(fp_nav->tls_version));
-					 fprintf(log_fd, "\"fingerprint_desc\": \"%.*s\", ", fp_nav->desc_length, fp_nav->desc);
-
-					 fprintf(log_fd, "\"server_name\": \"");
-
-					 if(server_name != NULL) {
-						for (arse = 7 ; arse <= (server_name[0]*256 + server_name[1]) + 1 ; arse++) {
-							if (server_name[arse] > 0x20 && server_name[arse] < 0x7b)
-								fprintf(log_fd, "%c", server_name[arse]);
-						}
-					}
-
-					fprintf(log_fd, "\" }\n");
-
-
+					print_log(printable_time, server_name, ip_version, ipv4, ipv6, tcp, udp, teredo, fp_nav);
 
 			} else {
 				// Fuzzy Match goes here (if we ever want it)
@@ -719,12 +631,6 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 
 
 		if(matchcount == 0) {
-			/* Write to unknown fingerprint pcap file (if opened already) */
-//			if(output_handle != NULL) {
-				//pcap_dump(output_handle, pcap_header, packet);
-//			}
-
-
 
 			/*
 				OK, we're setting up a signature, let's  actually do some memory fun
@@ -912,6 +818,8 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 			fprintf(json_fd, "}\n");
 
 
+			/* Print the record into the normal log */
+			print_log(printable_time, server_name, ip_version, ipv4, ipv6, tcp, udp, teredo, fp_nav);
 
 			/* **************************** */
 			/* END OF RECORD - OR SOMETHING */
@@ -932,4 +840,101 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 
 		}
 
+}
+
+int print_log(char* printable_time, char *server_name, int ip_version, struct ipv4_header *ipv4, struct ip6_hdr *ipv6, struct tcp_header *tcp, struct udp_header *udp, struct teredo_header *teredo, struct fingerprint_new *fp_nav) {
+		/* Prints out line of JSON to the log_fd descriptor */
+
+		char src_address_buffer[64];	/* Printable address */
+		char dst_address_buffer[64];	/* Printable address */
+		int arse; 						/* Just a loop counter */
+
+		 fprintf(log_fd, "{ "); // May need more header to define type?
+		 fprintf(log_fd, "\"timestamp\": \"%s\", ", printable_time);
+		 fprintf(log_fd, "\"event\": \"fingerprint_match\", ");
+
+		 fprintf(log_fd, "\"ip_version\": ");
+		 switch(ip_version) {
+			 case 4:
+				/* IPv4 */
+				fprintf(log_fd, "\"ipv4\", ");
+				inet_ntop(AF_INET,(void*)&ipv4->ip_src,src_address_buffer,sizeof(src_address_buffer));
+				inet_ntop(AF_INET,(void*)&ipv4->ip_dst,dst_address_buffer,sizeof(dst_address_buffer));
+				fprintf(log_fd, "\"ipv4_src\": \"%s\", ", src_address_buffer);
+				fprintf(log_fd, "\"ipv4_dst\": \"%s\", ", dst_address_buffer);
+
+				fprintf(log_fd, "\"src_port\": %hu, ", ntohs(tcp->th_sport));
+				fprintf(log_fd, "\"dst_port\": %hu, ", ntohs(tcp->th_dport));
+
+				break;
+			 case 6:
+				/* IPv6 */
+				fprintf(log_fd, "\"ipv6\", ");
+				inet_ntop(AF_INET6,(void*)&ipv6->ip6_src,src_address_buffer,sizeof(src_address_buffer));
+				inet_ntop(AF_INET6,(void*)&ipv6->ip6_dst,dst_address_buffer,sizeof(dst_address_buffer));
+				fprintf(log_fd, "\"ipv6_src\": \"%s\", ", src_address_buffer);
+				fprintf(log_fd, "\"ipv6_dst\": \"%s\", ", dst_address_buffer);
+
+				fprintf(log_fd, "\"src_port\": %hu, ", ntohs(tcp->th_sport));
+				fprintf(log_fd, "\"dst_port\": %hu, ", ntohs(tcp->th_dport));
+				break;
+			 case 7:
+				/*
+				 * Teredo.  As this is an IPv6 within IPv4 tunnel, both sets of address are logged.
+				 * The field names remain the same for ease of reporting on "all traffic from X" type
+				 * scenarios, however the "ip_version" field makes it clear that this is an encapsulted
+				 * tunnel.
+				 */
+				fprintf(log_fd, "\"teredo\", ");
+				inet_ntop(AF_INET,(void*)&ipv4->ip_src,src_address_buffer,sizeof(src_address_buffer));
+				inet_ntop(AF_INET,(void*)&ipv4->ip_dst,dst_address_buffer,sizeof(dst_address_buffer));
+				fprintf(log_fd, "\"ipv4_src\": \"%s\", ", src_address_buffer);
+				fprintf(log_fd, "\"ipv4_dst\": \"%s\", ", dst_address_buffer);
+				inet_ntop(AF_INET6,(void*)&ipv6->ip6_src,src_address_buffer,sizeof(src_address_buffer));
+				inet_ntop(AF_INET6,(void*)&ipv6->ip6_dst,dst_address_buffer,sizeof(dst_address_buffer));
+				fprintf(log_fd, "\"ipv6_src\": \"%s\", ", src_address_buffer);
+				fprintf(log_fd, "\"ipv6_dst\": \"%s\", ", dst_address_buffer);
+
+				fprintf(log_fd, "\"src_port\": %hu, ", ntohs(tcp->th_sport));
+				fprintf(log_fd, "\"dst_port\": %hu, ", ntohs(tcp->th_dport));
+
+				/* Add in ports of the outer Teredo tunnel? */
+
+				break;
+			 case 8:
+				/*
+				 * 6in4. 	As this is an IPv6 within IPv4 tunnel, both sets of address are logged.
+				 * The field names remain the same for ease of reporting on "all traffic from X" type
+				 * scenarios, however the "ip_version" field makes it clear that this is an encapsulted
+				 * tunnel.
+				 */
+				fprintf(log_fd, "\"6in4\", ");
+				inet_ntop(AF_INET,(void*)&ipv4->ip_src,src_address_buffer,sizeof(src_address_buffer));
+				inet_ntop(AF_INET,(void*)&ipv4->ip_dst,dst_address_buffer,sizeof(dst_address_buffer));
+				fprintf(log_fd, "\"ipv4_src\": \"%s\", ", src_address_buffer);
+				fprintf(log_fd, "\"ipv4_dst\": \"%s\", ", dst_address_buffer);
+				inet_ntop(AF_INET6,(void*)&ipv6->ip6_src,src_address_buffer,sizeof(src_address_buffer));
+				inet_ntop(AF_INET6,(void*)&ipv6->ip6_dst,dst_address_buffer,sizeof(dst_address_buffer));
+				fprintf(log_fd, "\"ipv6_src\": \"%s\", ", src_address_buffer);
+				fprintf(log_fd, "\"ipv6_dst\": \"%s\", ", dst_address_buffer);
+
+				fprintf(log_fd, "\"src_port\": %hu, ", ntohs(tcp->th_sport));
+				fprintf(log_fd, "\"dst_port\": %hu, ", ntohs(tcp->th_dport));
+				break;
+		 }
+
+		 fprintf(log_fd, "\"tls_version\": \"%s\", ", ssl_version(fp_nav->tls_version));
+		 fprintf(log_fd, "\"fingerprint_desc\": \"%.*s\", ", fp_nav->desc_length, fp_nav->desc);
+		 fprintf(log_fd, "\"server_name\": \"");
+
+		 if(server_name != NULL) {
+			for (arse = 7 ; arse <= (server_name[0]*256 + server_name[1]) + 1 ; arse++) {
+				if (server_name[arse] > 0x20 && server_name[arse] < 0x7b)
+					fprintf(log_fd, "%c", server_name[arse]);
+			}
+		}
+
+
+		fprintf(log_fd, "\" }\n");
+		return 0;
 }

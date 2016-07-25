@@ -46,9 +46,11 @@ def cleanse(filename):
 				i["compression_length"].strip() == x["compression_length"].strip() and \
 				i["compression"].strip() == x["compression"].strip() and \
 				i["extensions"].strip() == x["extensions"].strip() and	\
-				"e_curves" in i \
+				"e_curves" in i and \
+				"e_curves" in x \
 				and	i["e_curves"].strip() == x["e_curves"].strip() and \
 				"sig_alg" in i and \
+				"sig_alg" in x and \
 				i["sig_alg"].strip() == x["sig_alg"].strip() and \
 				"ec_point_fmt" in i and \
 				i["ec_point_fmt"].strip() == x["ec_point_fmt"].strip():

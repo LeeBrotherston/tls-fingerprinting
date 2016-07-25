@@ -235,3 +235,4 @@ void sig_handler (int signo);
 int extensions_compare(uint8_t *packet, uint8_t *fingerprint, int length, int count);
 void print_usage(char *bin_name);
 void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_char *packet);
+int print_log(char* printable_time, char *server_name, int ip_version, struct ipv4_header *ipv4, struct ip6_hdr *ipv6, struct tcp_header *tcp, struct udp_header *udp, struct teredo_header *teredo, struct fingerprint_new *fp_nav);

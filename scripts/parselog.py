@@ -17,7 +17,7 @@ while 1:
     where = file.tell()
     line = file.readline()
     if not line:
-        time.sleep(1)
+        time.sleep(0.1)
         file.seek(where)
     else:
 		jline = json.loads(line)

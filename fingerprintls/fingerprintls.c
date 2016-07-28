@@ -60,6 +60,10 @@ mistakes, kthnxbai.
 /* Stuff to process packets */
 #include "packet_processing.c"
 
+/* For username to uid lookup */
+#include <pwd.h>
+#include <uuid/uuid.h>
+
 
 /*
  * print help text
@@ -76,7 +80,7 @@ void print_usage(char *bin_name) {
 //	fprintf(stderr, "    -s                Output JSON signatures of unknown connections to stdout\n");  // Comment this out as I'm trying to deprecate this
 	fprintf(stderr, "    -d                Show reasons for discarded packets (post BPF)\n");
 	fprintf(stderr, "    -f <fpdb>         Load the (binary) FingerPrint Database\n");
-	fprintf(stderr, "    -u <uid>          Drop privileges to specified UID (not username)\n");
+	fprintf(stderr, "    -u <uid>          Drop privileges to specified username\n");
 	fprintf(stderr, "\n");
 	return;
 }
@@ -89,10 +93,11 @@ uint shard_fp (struct fingerprint_new *fp_lookup, uint16_t maxshard) {
 int main(int argc, char **argv) {
 
 	char *dev = NULL;											/* capture device name */
-	char *unpriv_user = NULL;							/* User for dropping privs */
+	uid_t unpriv_user = -1;							/* User for dropping privs */
 	char errbuf[PCAP_ERRBUF_SIZE];				/* error buffer */
 	extern pcap_t *handle;								/* packet capture handle */
 	extern pcap_dumper_t *output_handle;					/* output to pcap handle */
+	struct passwd* priv_passwd;					/* User id when dropping privileges */
 
 	char *filter_exp = default_filter;
 	int arg_start = 1, i;
@@ -185,7 +190,12 @@ int main(int argc, char **argv) {
 				break;
 			case 'u':
 				/* User for dropping privileges to */
-				unpriv_user = argv[++i];
+				priv_passwd = getpwnam(argv[++i]);
+				if(priv_passwd == NULL) {
+					printf("Cannot find user: %s\n", argv[i]);
+					exit(-1);
+				}
+				unpriv_user = priv_passwd->pw_uid;
 				break;
 			case 'f':
 				/* Read the *new* *sparkly* *probably broken* :) binary Fingerprint Database from file */
@@ -221,7 +231,7 @@ int main(int argc, char **argv) {
 	/* Interface should already be opened, and files read we can drop privs now */
 	/* This should stay the first action as lowering privs reduces risk from any subsequent actions */
 	/* being poorly implimented and running as root */
-	if (unpriv_user != NULL) {
+	if (unpriv_user != -1) {
 		if (setgroups(0, NULL) == -1) {
 			fprintf(stderr, "WARNING: could not set groups to 0 prior to dropping privileges\n");
 		} else {
@@ -232,7 +242,7 @@ int main(int argc, char **argv) {
 		} else {
 			fprintf(stderr, "Dropped effective group successfully\n");
 		}
-		if (setuid(atoi(unpriv_user)) == -1) {
+		if (setuid(unpriv_user) == -1) {
 			fprintf(stderr, "WARNING: could not drop privileges to specified UID\n");
 		} else {
 			fprintf(stderr, "Changed UID successfully\n");

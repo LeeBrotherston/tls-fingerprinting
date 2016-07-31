@@ -1,0 +1,32 @@
+==============================================
+FingerPrinTLS (and associated tools) ChangeLog
+==============================================
+
+A complete list of changes per commit can always be found here:
+
+https://github.com/LeeBrotherston/tls-fingerprinting/commits/master
+
+And per release, here:
+
+https://github.com/LeeBrotherston/tls-fingerprinting/releases
+
+==============================================
+
+1.0.1 - 2016-07-31
+
+- Added a changelog!
+- Multiple Fingerprint Updates
+- Added TLS1.3 support
+- Added separate licence file (as opposed to within sourcecode)
+- Added setgroups to the privilege dropping code
+- Fixed a bug regarding server name printing
+- Created a README.md to start trying to add documentation
+- Updated -u to take username instead of just a uid
+- Included PID in dynamically generated fingerprint names to avoid confusion on
+  daemon restarts
+- Trimed duplicate fingerprints
+
+
+1.0.0 - 2016-06-22
+
+Cleared up all the known bugs during initial development and marked 1.0.0

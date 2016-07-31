@@ -18,5 +18,28 @@ The commandline switches, as ridiculous as some of them are, are:
 -f <fpdb>         Load the (binary) FingerPrint Database from the specified location
 -u <uid>          Drop privileges to specified UID (not username).  This allows the use of this tool without running as root (although it will need to be started as root in order to obtain permissions to sniff live interfaces)
 ```
+
+# Installing
+
+FingerPrinTLS is provided with a make file which I have been testing on:
+
+* Mac OS X
+* Linux
+* FreeBSD
+
+Using:
+
+* gcc
+* clang
+
+Other combinations may well work, just I have not tried them yet.
+
+If for some reason you cannot use makefiles to build software on your system the compiler commandline should look something like:
+
+```
+$compiler fingerprintls.c -o fingerprintls -lpcap
+``` 
+
+
 [1]: https://blog.squarelemon.com/tls-fingerprinting/
 [2]: https://github.com/LeeBrotherston/tls-fingerprinting/tree/master/scripts

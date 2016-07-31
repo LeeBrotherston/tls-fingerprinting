@@ -2,8 +2,13 @@
 
 These tools are to enable the matching (either on the wire or via pcap),
 creation, and export of TLS Fingerprints to other formats.  For futher
-information on TLS Fingerprinting please see my [TLS Fingerprinting paper][1],
-[talk resources][2], and [DerbyCon Presentation][5] on the topic.
+information on TLS Fingerprinting:
+
+* My [TLS Fingerprinting paper][1],
+* My [Derbycon Talk][2], and [slides][3] on the topic.
+* My [SecTorCA Talk][4], and [slides][5] on the topic.
+* TLS Fingerprinting Discussion on [Brakeing Down Security Podcast][6]
+* Quick [demo of tor detection][7] with FingerPrinTLS
 
 In summary the tools are:
 
@@ -15,11 +20,15 @@ In summary the tools are:
 
 Please feel free to raise issues and make pull requests to submit code changes, fingerprint submissions, etc.
 
-You can find [me on twitter][3] and [the project on twitter][4] also.
+You can find [me on twitter][8] and [the project on twitter][9] also.
 
 
 [1]: https://blog.squarelemon.com/tls-fingerprinting/
-[2]: https://blog.squarelemon.com/blog/2015/09/25/tls-fingerprinting-resources/
-[3]: https://twitter.com/synackpse
-[4]: https://twitter.com/FingerprinTLS
-[5]: https://www.youtube.com/watch?v=XX0FRAy2Mec
+[2]: https://www.youtube.com/watch?v=XX0FRAy2Mec
+[3]: http://www.slideshare.net/LeeBrotherston/tls-fingerprinting-stealthier-attacking-smarter-defending-derbycon
+[4]: http://2015.video.sector.ca/video/144175700 
+[5]: http://www.slideshare.net/LeeBrotherston/tls-fingerprinting-sectorca-edition
+[6]: http://brakeingsecurity.com/2015-007-fingerprintls-profiling-application-with-lee-brotherston
+[7]: https://www.youtube.com/watch?v=ifODVQ3hBVs
+[8]: https://twitter.com/synackpse
+[9]: https://twitter.com/FingerprinTLS

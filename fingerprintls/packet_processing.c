@@ -642,15 +642,24 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 
 			/* Populate the fingerprint */
 			fp_packet->fingerprint_id = 0;
+
+			/* Check it's not a system I've not seen with crazy long PIDs */
 			fp_packet->desc_length = strlen("Dynamic ") + strlen(hostname) + 7; // 7 should cover the max uint16_t + space
+			if(getpid() < 99999) {
+				fp_packet->desc_length += 6; /* Adding space to include PID in the temp description */
+			}
 			fp_packet->desc = malloc(fp_packet->desc_length);
 
 			if(fp_packet->desc == NULL) {
 				printf("Malloc Error (desc)\n");
 				exit(0);
 			}
-			sprintf(fp_packet->desc, "Dynamic %s %d", hostname, newsig_count);
-
+			/* Makes it easier to find dynamic signatures in logs after a daemon restart */
+			if(getpid() < 99999) {
+				sprintf(fp_packet->desc, "Dynamic %s %d %d", hostname, getpid(), newsig_count);
+			} else {
+				sprintf(fp_packet->desc, "Dynamic %s %d", hostname, newsig_count);
+			}
 
 			fp_packet->sig_alg = malloc(fp_packet->sig_alg_length);
 			if(fp_packet->sig_alg == NULL) {

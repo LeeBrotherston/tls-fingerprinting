@@ -505,8 +505,9 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 				fp_packet->extensions_length = (ext_count * 2);
 
 				/* Increment past the payload of the extensions */
-				ext_id += (packet_data[ext_id + 2]*256) + packet_data[ext_id + 3] + 3;
 			}
+			ext_id += (packet_data[ext_id + 2]*256) + packet_data[ext_id + 3] + 3;
+
 
 			if((packet_data + ext_id) >= (payload + size_payload)) {
 				if(show_drops == 1) {
@@ -575,10 +576,14 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		// Load up the extensions
 		int unarse = 0;
 		for (arse = 0 ; arse < ext_len ;) {
-			fp_packet->extensions[unarse] = (uint8_t) extensions_tmp_ptr[arse];
-			fp_packet->extensions[unarse+1] = (uint8_t) extensions_tmp_ptr[arse+1];
-			unarse += 2;
-			arse = arse + 4 + (((uint8_t) extensions_tmp_ptr[(arse+2)])*256) + (uint8_t)(extensions_tmp_ptr[arse+3]);
+			if((uint8_t) extensions_tmp_ptr[arse] == 0x00 && (uint8_t) extensions_tmp_ptr[arse+1] == 0x15 && discard_pad == 1) {
+				arse = arse + 4 + (((uint8_t) extensions_tmp_ptr[(arse+2)])*256) + (uint8_t)(extensions_tmp_ptr[arse+3]);
+			} else {
+				fp_packet->extensions[unarse] = (uint8_t) extensions_tmp_ptr[arse];
+				fp_packet->extensions[unarse+1] = (uint8_t) extensions_tmp_ptr[arse+1];
+				unarse += 2;
+				arse = arse + 4 + (((uint8_t) extensions_tmp_ptr[(arse+2)])*256) + (uint8_t)(extensions_tmp_ptr[arse+3]);
+			}
 		}
 
 		/* ********************************************* */
@@ -629,7 +634,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 					/* In theory multiple matches were not possible, now with padding stripping they are. */
 					/* Therefore forbibly exiting the for loop here.  Should also make things faster as   */
 					/* we no longer test the remainder of the chain after a match                         */
-					break;
+					//break;
 
 
 			} else {

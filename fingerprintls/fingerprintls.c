@@ -345,24 +345,24 @@ int main(int argc, char **argv) {
 			for (counter = 0; counter < fp_current->extensions_length; counter += 2) {
 				/* This is the two byte value for the padding extension */
 				if(fp_current->extensions[counter] == 0 && fp_current->extensions[counter+1] == 21) {
-					fprintf(stderr, "\nStripping padding from : %.*s\n", fp_current->desc_length, fp_current->desc);
+					//fprintf(stderr, "\nStripping padding from : %.*s\n", fp_current->desc_length, fp_current->desc);
 
 					/* Print some debuggin material */
-					for(debug_counter = 0; debug_counter < fp_current->extensions_length; debug_counter += 2) {
-						printf("%02X%02X ", fp_current->extensions[debug_counter], fp_current->extensions[debug_counter+1]);
-					}
-					printf(" Length: %i\n", fp_current->extensions_length);
+					//for(debug_counter = 0; debug_counter < fp_current->extensions_length; debug_counter += 2) {
+					//	printf("%02X%02X ", fp_current->extensions[debug_counter], fp_current->extensions[debug_counter+1]);
+					//}
+					//printf(" Length: %i\n", fp_current->extensions_length);
 
 					/* memmove is like memcpy, except it is save for overlapping source and dest (woo!) */
-					fprintf(stderr, "src: %u  dst: %u  length: %i\n", fp_current->extensions+(counter+2), fp_current->extensions+(counter), (fp_current->extensions_length - (counter + 2)));
+					//fprintf(stderr, "src: %u  dst: %u  length: %i\n", fp_current->extensions+(counter+2), fp_current->extensions+(counter), (fp_current->extensions_length - (counter + 2)));
 					memmove(fp_current->extensions+(counter), fp_current->extensions+(counter+2), (fp_current->extensions_length - (counter + 2)));
 					fp_current->extensions_length -= 2;
 
 					/* Print some debuggin material */
-					for(debug_counter = 0; debug_counter < fp_current->extensions_length; debug_counter += 2) {
-						printf("%02X%02X ", fp_current->extensions[debug_counter], fp_current->extensions[debug_counter+1]);
-					}
-					printf(" Length: %i\n", fp_current->extensions_length);
+					//for(debug_counter = 0; debug_counter < fp_current->extensions_length; debug_counter += 2) {
+					//	printf("%02X%02X ", fp_current->extensions[debug_counter], fp_current->extensions[debug_counter+1]);
+					//}
+					//printf(" Length: %i\n", fp_current->extensions_length);
 				}
 			}
 		}

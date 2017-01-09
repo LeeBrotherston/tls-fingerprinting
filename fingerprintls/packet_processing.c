@@ -113,7 +113,6 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 				fprintf(stderr, "[%s] Malformed timestamp from libpcap\n", printable_time);
 			return;
 		} else {
-			/* XXX generates a compile time warning, check this out */
 			strftime(printable_time, sizeof printable_time, "%Y-%m-%d %H:%M:%S", print_time);
 		}
 

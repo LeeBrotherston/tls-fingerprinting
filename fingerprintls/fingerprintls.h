@@ -35,6 +35,9 @@ mistakes, kthnxbai.
 
 #define FPSHARD 32
 
+/* XXX Work this out and define properly */
+#define MIN_PACKET_LEN 32
+
 
 /* Ethernet addresses are 6 bytes */
 // #define ETHER_ADDR_LEN	6

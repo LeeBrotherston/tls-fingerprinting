@@ -59,7 +59,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		char dst_address_buffer[64];
 
 		struct timeval packet_time;
-		struct tm print_time;
+		struct tm *print_time;
 		char printable_time[64];
 
 		struct fingerprint_new *fp_nav;			/* For navigating the fingerprint database */
@@ -105,8 +105,36 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		*/
 
 		packet_time = pcap_header->ts;
-		print_time = *localtime(&packet_time.tv_sec);
-		strftime(printable_time, sizeof printable_time, "%Y-%m-%d %H:%M:%S", &print_time);
+		print_time = localtime(&packet_time.tv_sec);
+		if (print_time == NULL) {
+			/* If we get a bad timestamp, set to X's for now, probably just drop in future..... thanks Parker!! ;) */
+			snprintf(printable_time, sizeof("XXXX-XX-XX XX:XX:XX"), "XXXX-XX-XX XX:XX:XX");
+			if (show_drops)
+				fprintf(stderr, "[%s] Malformed timestamp from libpcap\n", printable_time);
+			return;
+		} else {
+			/* XXX generates a compile time warning, check this out */
+			strftime(printable_time, sizeof printable_time, "%Y-%m-%d %H:%M:%S", print_time);
+		}
+
+		if(pcap_header->len != pcap_header->caplen) {
+			/* This is most likely something bad, and likely non-fingerprintable anyway */
+			if (show_drops)
+				printf("[%s] PCAP length does not match packet header length: %u %u\n", printable_time, pcap_header->caplen, pcap_header->len);
+			return;
+		}
+
+		/* Temporary debugging.  XXX This will be removed */
+		if (show_drops)
+			printf("DEBUG: pcap header length: %u %u\n", pcap_header->len, pcap_header->caplen);
+
+		/* XXX Revisit which value to use  - see if this can be part of BPF.  Should be to *at least* payload */
+		/* Check that the size of the captured packet meets a minimum to even bother considering */
+		if (pcap_header->caplen < MIN_PACKET_LEN) {
+			if (show_drops)
+				printf("[%s] Packet length (%i) below minimum (%i)\n", printable_time, pcap_header->caplen, MIN_PACKET_LEN);
+			return;
+		}
 
 
 		/* ******************************************** */
@@ -176,6 +204,11 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		switch(ip_version) {
 			case 4:
 				/* IP Header */
+				if((SIZE_ETHERNET + size_vlan_offset) > pcap_header->caplen) {
+					if(show_drops)
+						fprintf(stderr, "[%s] Packet Drop: incomplete packet.  Size: %i\n", printable_time, pcap_header->caplen);
+					return;
+				}
 				ipv4 = (struct ipv4_header*)(packet + SIZE_ETHERNET + size_vlan_offset);
 				size_ip = IP_HL(ipv4)*4;
 
@@ -205,6 +238,11 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 
 						/* setting offset later with size_ip manipulation...  may need to ammend this */
 						size_ip += sizeof(struct udp_header) + sizeof(struct teredo_header);
+						if(size_ip > pcap_header->caplen) {
+							if(show_drops)
+								fprintf(stderr, "[%s] Packet Drop: incomplete packet.  Size: %i\n", printable_time, pcap_header->caplen);
+							return;
+						}
 						break;
 
 					case 0x29:
@@ -212,6 +250,11 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 						ip_version = 8;  // No reason... YOLO
 						ipv6 = (struct ip6_hdr*)(packet + SIZE_ETHERNET + size_vlan_offset + sizeof(struct ipv4_header));
 						size_ip += 40;
+						if(size_ip > pcap_header->caplen) {
+							if(show_drops)
+								fprintf(stderr, "[%s] Packet Drop: incomplete packet.  Size: %i\n", printable_time, pcap_header->caplen);
+							return;
+						}
 						break;
 
 					default:
@@ -229,6 +272,12 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 				ipv6 = (struct ip6_hdr*)(packet + SIZE_ETHERNET + size_vlan_offset);
 				size_ip = 40;
 
+				if(size_ip > pcap_header->caplen) {
+					if(show_drops)
+						fprintf(stderr, "[%s] Packet Drop: incomplete packet.  Size: %i\n", printable_time, pcap_header->caplen);
+					return;
+				}
+
 				/* TODO: Parse 'next header(s)' */
 				//printf("IP Version? %i\n",ntohl(ipv6->ip6_vfc)>>28);
 				//printf("Traffic Class? %i\n",(ntohl(ipv6->ip6_vfc)&0x0ff00000)>>24);
@@ -239,6 +288,11 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 				// XXX These lines are duplicated, will de-dupe later this is for testing without breaking :)
 				tcp = (struct tcp_header*)(packet + SIZE_ETHERNET + size_vlan_offset + size_ip);
 				payload = (u_char *)(packet + SIZE_ETHERNET + size_vlan_offset + size_ip + (tcp->th_off * 4));
+				if((SIZE_ETHERNET + size_vlan_offset + size_ip + (tcp->th_off * 4)) > pcap_header->caplen) {
+					if(show_drops)
+						fprintf(stderr, "[%s] Packet Drop: incomplete packet.  Size: %i\n", printable_time, pcap_header->caplen);
+					return;
+				}
 
 				/* Sanity Check... Should be IPv6 */
 				if ((ntohl(ipv6->ip6_vfc)>>28)!=6){

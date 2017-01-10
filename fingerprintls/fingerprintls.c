@@ -293,11 +293,11 @@ int main(int argc, char **argv) {
 	int x, y;
 	//extern struct fingerprint_new *fp_first;
 	struct fingerprint_new *fp_current;
-	extern struct fingerprint_new *search[8][4];
+	extern struct fingerprint_new *search[8][5];
 
 	/* Initialise so that we know when we are on the first in any one chain */
 	for (x = 0 ; x < 8 ; x++) {
-		for (y = 0 ; y < 4 ; y++) {
+		for (y = 0 ; y < 5 ; y++) {
 			search[x][y] = NULL;
 		}
 	}

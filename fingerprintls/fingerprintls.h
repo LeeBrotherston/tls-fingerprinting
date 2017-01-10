@@ -220,7 +220,7 @@ FILE *json_fd = NULL;
 FILE *fpdb_fd = NULL;
 FILE *log_fd = NULL;
 
-struct fingerprint_new *search[8][4];
+struct fingerprint_new *search[8][5];
 char hostname[HOST_NAME_MAX];			/* store the hostname once to save multiple lookups */
 
 

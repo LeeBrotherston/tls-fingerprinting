@@ -80,7 +80,7 @@ void print_usage(char *bin_name) {
 	fprintf(stderr, "    -d                Show reasons for discarded packets (post BPF)\n");
 	fprintf(stderr, "    -f <fpdb>         Load the (binary) FingerPrint Database\n");
 	fprintf(stderr, "    -u <uid>          Drop privileges to specified username\n");
-	fprintf(stderr, "    -D                Discard padding for fuzzy matching\n");
+	fprintf(stderr, "    -D                Do not discard padding (don't do without understanding what this does)\n");
 	fprintf(stderr, "\n");
 	return;
 }
@@ -191,7 +191,7 @@ int main(int argc, char **argv) {
 				break;
 			case 'D':
 				/* Discard padding */
-				discard_pad = 1;
+				discard_pad = 0;
 				break;
 			case 'u':
 				/* User for dropping privileges to */

@@ -14,7 +14,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
+along with FingerprinTLS.  If not, see <http://www.gnu.org/licenses/>.
 
 Exciting Licence Info Addendum.....
 
@@ -103,8 +103,9 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 			header, however I am keeping it here incase we derive it from somewhere
 			else in future and we want it early in the process.
 		*/
-
-		packet_time = pcap_header->ts;
+		/* Copy each field separately to account for systems where these use different field sizes (OpenBSD...) */
+		packet_time.tv_sec = pcap_header->ts.tv_sec;
+		packet_time.tv_usec = pcap_header->ts.tv_usec;
 		print_time = localtime(&packet_time.tv_sec);
 		if (print_time == NULL) {
 			/* If we get a bad timestamp, set to X's for now, probably just drop in future..... thanks Parker!! ;) */
@@ -115,7 +116,6 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		} else {
 			strftime(printable_time, sizeof printable_time, "%Y-%m-%d %H:%M:%S", print_time);
 		}
-
 		if(pcap_header->len != pcap_header->caplen) {
 			/* This is most likely something bad, and likely non-fingerprintable anyway */
 			if (show_drops)
@@ -709,9 +709,9 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 			}
 			/* Makes it easier to find dynamic signatures in logs after a daemon restart */
 			if(getpid() < 99999) {
-				sprintf(fp_packet->desc, "Dynamic %s %d %d", hostname, getpid(), newsig_count);
+				snprintf(fp_packet->desc, fp_packet->desc_length, "Dynamic %s %d %d", hostname, getpid(), newsig_count);
 			} else {
-				sprintf(fp_packet->desc, "Dynamic %s %d", hostname, newsig_count);
+				snprintf(fp_packet->desc, fp_packet->desc_length, "Dynamic %s %d", hostname, newsig_count);
 			}
 
 			fp_packet->sig_alg = malloc(fp_packet->sig_alg_length);

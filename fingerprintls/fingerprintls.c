@@ -14,7 +14,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
+along with FingerprinTLS.  If not, see <http://www.gnu.org/licenses/>.
 
 Exciting Licence Info Addendum.....
 
@@ -41,7 +41,12 @@ mistakes, kthnxbai.
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#if defined(__OpenBSD__)
+#include <net/if_arp.h>
+#include <netinet/if_ether.h>
+#else
 #include <net/ethernet.h>
+#endif
 #include <netinet/ip6.h>
 #include <grp.h>
 
@@ -410,10 +415,9 @@ int main(int argc, char **argv) {
 		    filter_exp, pcap_geterr(handle));
 		exit(EXIT_FAILURE);
 	}
-
 	/* setup hostname variable for use in logs (incase of multiple hosts) */
 	if(gethostname(hostname, HOST_NAME_MAX) != 0) {
-		sprintf(hostname, "unknown");
+		snprintf(hostname, sizeof("unknown"), "unknown");
 	}
 
 	/* now we can set our callback function */

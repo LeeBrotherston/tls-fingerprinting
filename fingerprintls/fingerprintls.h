@@ -14,7 +14,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
+along with FingerprinTLS.  If not, see <http://www.gnu.org/licenses/>.
 
 Exciting Licence Info Addendum.....
 
@@ -177,7 +177,14 @@ struct fingerprint_new {
 /* Filter should now catch TCP based Client Hello, all IPv6 (because BPF doesn't support v6 Payload... gah!) and Client Hellos wrapped in Teredo tunnels */
 
 // XXX CHECK IPv6.... doesn't seem to work properly for Chrome testing time!!
+// Using terrible ifdefs here to avoid needing to try to figure out the root cause of the OpenBSD errors with simple filters.
+// Without this, execution on OpenBSD throws: Couldn't parse filter <outputs the filter string here>: too many registers needed to evaluate expression
+// Short filters sometimes work and sometimes don't, seems like some sort of weird complexity issue.
+#if defined(__OpenBSD__)
+char *default_filter = "";
+#else
 char *default_filter = "(tcp[tcp[12]/16*4]=22 and (tcp[tcp[12]/16*4+5]=1) and (tcp[tcp[12]/16*4+9]=3) and (tcp[tcp[12]/16*4+1]=3)) or (ip6[(ip6[52]/16*4)+40]=22 and (ip6[(ip6[52]/16*4+5)+40]=1) and (ip6[(ip6[52]/16*4+9)+40]=3) and (ip6[(ip6[52]/16*4+1)+40]=3)) or ((udp[14] = 6 and udp[16] = 32 and udp[17] = 1) and ((udp[(udp[60]/16*4)+48]=22) and (udp[(udp[60]/16*4)+53]=1) and (udp[(udp[60]/16*4)+57]=3) and (udp[(udp[60]/16*4)+49]=3))) or (proto 41 and ip[26] = 6 and ip[(ip[72]/16*4)+60]=22 and (ip[(ip[72]/16*4+5)+60]=1) and (ip[(ip[72]/16*4+9)+60]=3) and (ip[(ip[72]/16*4+1)+60]=3))";
+#endif
 
 //char *default_filter = "";
 

@@ -77,10 +77,10 @@ void print_usage(char *bin_name) {
 	fprintf(stderr, "    -P <pcap file>    Save packets to specified pcap file for unknown fingerprints\n");
 	fprintf(stderr, "    -j <json file>    Output JSON fingerprints\n");
 	fprintf(stderr, "    -l <log file>     Output logfile (JSON format)\n");
-//	fprintf(stderr, "    -s                Output JSON signatures of unknown connections to stdout\n");  // Comment this out as I'm trying to deprecate this
 	fprintf(stderr, "    -d                Show reasons for discarded packets (post BPF)\n");
 	fprintf(stderr, "    -f <fpdb>         Load the (binary) FingerPrint Database\n");
 	fprintf(stderr, "    -u <uid>          Drop privileges to specified username\n");
+	fprintf(stderr, "    -D                Do not discard padding (don't do without understanding what this does)\n");
 	fprintf(stderr, "\n");
 	return;
 }
@@ -108,6 +108,7 @@ int main(int argc, char **argv) {
 	uint8_t *fpdb_raw = NULL;
 	int	fp_count = 0;
 	extern int show_drops;
+	extern int discard_pad;
 	extern char hostname[HOST_NAME_MAX];
 	show_drops = 0;
 
@@ -187,6 +188,10 @@ int main(int argc, char **argv) {
 			case 'd':
 				/* Show Dropped Packet Info */
 				show_drops = 1;
+				break;
+			case 'D':
+				/* Discard padding */
+				discard_pad = 0;
 				break;
 			case 'u':
 				/* User for dropping privileges to */
@@ -291,7 +296,6 @@ int main(int argc, char **argv) {
 	}
 
 	int x, y;
-	//extern struct fingerprint_new *fp_first;
 	struct fingerprint_new *fp_current;
 	extern struct fingerprint_new *search[8][4];
 
@@ -333,6 +337,35 @@ int main(int argc, char **argv) {
 
 		fp_current->extensions_length = (uint16_t) ((uint16_t)*(fpdb_raw+x) << 8) + ((uint8_t)*(fpdb_raw+x+1));
 		fp_current->extensions = fpdb_raw+x+2;
+
+		/* If discarding padding, strip out here.  In future, if this becomes default I will remove it at the database creation time */
+		if(discard_pad == 1) {
+			int counter;
+			int debug_counter;
+			for (counter = 0; counter < fp_current->extensions_length; counter += 2) {
+				/* This is the two byte value for the padding extension */
+				if(fp_current->extensions[counter] == 0 && fp_current->extensions[counter+1] == 21) {
+					//fprintf(stderr, "\nStripping padding from : %.*s\n", fp_current->desc_length, fp_current->desc);
+
+					/* Print some debuggin material */
+					//for(debug_counter = 0; debug_counter < fp_current->extensions_length; debug_counter += 2) {
+					//	printf("%02X%02X ", fp_current->extensions[debug_counter], fp_current->extensions[debug_counter+1]);
+					//}
+					//printf(" Length: %i\n", fp_current->extensions_length);
+
+					/* memmove is like memcpy, except it is save for overlapping source and dest (woo!) */
+					//fprintf(stderr, "src: %u  dst: %u  length: %i\n", fp_current->extensions+(counter+2), fp_current->extensions+(counter), (fp_current->extensions_length - (counter + 2)));
+					memmove(fp_current->extensions+(counter), fp_current->extensions+(counter+2), (fp_current->extensions_length - (counter + 2)));
+					fp_current->extensions_length -= 2;
+
+					/* Print some debuggin material */
+					//for(debug_counter = 0; debug_counter < fp_current->extensions_length; debug_counter += 2) {
+					//	printf("%02X%02X ", fp_current->extensions[debug_counter], fp_current->extensions[debug_counter+1]);
+					//}
+					//printf(" Length: %i\n", fp_current->extensions_length);
+				}
+			}
+		}
 
 		x += (uint16_t)((*(fpdb_raw+x) >> 16) + *(fpdb_raw+x+1))+2; // Skip extensions list (not extensions - just the list)
 

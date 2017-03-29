@@ -14,7 +14,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
+along with FingerprinTLS.  If not, see <http://www.gnu.org/licenses/>.
 
 Exciting Licence Info Addendum.....
 
@@ -59,7 +59,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		char dst_address_buffer[64];
 
 		struct timeval packet_time;
-		struct tm print_time;
+		struct tm *print_time;
 		char printable_time[64];
 
 		struct fingerprint_new *fp_nav;			/* For navigating the fingerprint database */
@@ -103,10 +103,37 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 			header, however I am keeping it here incase we derive it from somewhere
 			else in future and we want it early in the process.
 		*/
+		/* Copy each field separately to account for systems where these use different field sizes (OpenBSD...) */
+		packet_time.tv_sec = pcap_header->ts.tv_sec;
+		packet_time.tv_usec = pcap_header->ts.tv_usec;
+		print_time = localtime(&packet_time.tv_sec);
+		if (print_time == NULL) {
+			/* If we get a bad timestamp, set to X's for now, probably just drop in future..... thanks Parker!! ;) */
+			snprintf(printable_time, sizeof("XXXX-XX-XX XX:XX:XX"), "XXXX-XX-XX XX:XX:XX");
+			if (show_drops)
+				fprintf(stderr, "[%s] Malformed timestamp from libpcap\n", printable_time);
+			return;
+		} else {
+			strftime(printable_time, sizeof printable_time, "%Y-%m-%d %H:%M:%S", print_time);
+		}
+		if(pcap_header->len != pcap_header->caplen) {
+			/* This is most likely something bad, and likely non-fingerprintable anyway */
+			if (show_drops)
+				printf("[%s] PCAP length does not match packet header length: %u %u\n", printable_time, pcap_header->caplen, pcap_header->len);
+			return;
+		}
 
-		packet_time = pcap_header->ts;
-		print_time = *localtime(&packet_time.tv_sec);
-		strftime(printable_time, sizeof printable_time, "%Y-%m-%d %H:%M:%S", &print_time);
+		/* Temporary debugging.  XXX This will be removed */
+		if (show_drops)
+			printf("DEBUG: pcap header length: %u %u\n", pcap_header->len, pcap_header->caplen);
+
+		/* XXX Revisit which value to use  - see if this can be part of BPF.  Should be to *at least* payload */
+		/* Check that the size of the captured packet meets a minimum to even bother considering */
+		if (pcap_header->caplen < MIN_PACKET_LEN) {
+			if (show_drops)
+				printf("[%s] Packet length (%i) below minimum (%i)\n", printable_time, pcap_header->caplen, MIN_PACKET_LEN);
+			return;
+		}
 
 
 		/* ******************************************** */
@@ -176,6 +203,11 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 		switch(ip_version) {
 			case 4:
 				/* IP Header */
+				if((SIZE_ETHERNET + size_vlan_offset) > pcap_header->caplen) {
+					if(show_drops)
+						fprintf(stderr, "[%s] Packet Drop: incomplete packet.  Size: %i\n", printable_time, pcap_header->caplen);
+					return;
+				}
 				ipv4 = (struct ipv4_header*)(packet + SIZE_ETHERNET + size_vlan_offset);
 				size_ip = IP_HL(ipv4)*4;
 
@@ -205,6 +237,11 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 
 						/* setting offset later with size_ip manipulation...  may need to ammend this */
 						size_ip += sizeof(struct udp_header) + sizeof(struct teredo_header);
+						if(size_ip > pcap_header->caplen) {
+							if(show_drops)
+								fprintf(stderr, "[%s] Packet Drop: incomplete packet.  Size: %i\n", printable_time, pcap_header->caplen);
+							return;
+						}
 						break;
 
 					case 0x29:
@@ -212,6 +249,11 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 						ip_version = 8;  // No reason... YOLO
 						ipv6 = (struct ip6_hdr*)(packet + SIZE_ETHERNET + size_vlan_offset + sizeof(struct ipv4_header));
 						size_ip += 40;
+						if(size_ip > pcap_header->caplen) {
+							if(show_drops)
+								fprintf(stderr, "[%s] Packet Drop: incomplete packet.  Size: %i\n", printable_time, pcap_header->caplen);
+							return;
+						}
 						break;
 
 					default:
@@ -229,6 +271,12 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 				ipv6 = (struct ip6_hdr*)(packet + SIZE_ETHERNET + size_vlan_offset);
 				size_ip = 40;
 
+				if(size_ip > pcap_header->caplen) {
+					if(show_drops)
+						fprintf(stderr, "[%s] Packet Drop: incomplete packet.  Size: %i\n", printable_time, pcap_header->caplen);
+					return;
+				}
+
 				/* TODO: Parse 'next header(s)' */
 				//printf("IP Version? %i\n",ntohl(ipv6->ip6_vfc)>>28);
 				//printf("Traffic Class? %i\n",(ntohl(ipv6->ip6_vfc)&0x0ff00000)>>24);
@@ -239,6 +287,11 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 				// XXX These lines are duplicated, will de-dupe later this is for testing without breaking :)
 				tcp = (struct tcp_header*)(packet + SIZE_ETHERNET + size_vlan_offset + size_ip);
 				payload = (u_char *)(packet + SIZE_ETHERNET + size_vlan_offset + size_ip + (tcp->th_off * 4));
+				if((SIZE_ETHERNET + size_vlan_offset + size_ip + (tcp->th_off * 4)) > pcap_header->caplen) {
+					if(show_drops)
+						fprintf(stderr, "[%s] Packet Drop: incomplete packet.  Size: %i\n", printable_time, pcap_header->caplen);
+					return;
+				}
 
 				/* Sanity Check... Should be IPv6 */
 				if ((ntohl(ipv6->ip6_vfc)>>28)!=6){
@@ -673,9 +726,9 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 			}
 			/* Makes it easier to find dynamic signatures in logs after a daemon restart */
 			if(getpid() < 99999) {
-				sprintf(fp_packet->desc, "Dynamic %s %d %d", hostname, getpid(), newsig_count);
+				snprintf(fp_packet->desc, fp_packet->desc_length, "Dynamic %s %d %d", hostname, getpid(), newsig_count);
 			} else {
-				sprintf(fp_packet->desc, "Dynamic %s %d", hostname, newsig_count);
+				snprintf(fp_packet->desc, fp_packet->desc_length, "Dynamic %s %d", hostname, newsig_count);
 			}
 
 			fp_packet->sig_alg = malloc(fp_packet->sig_alg_length);

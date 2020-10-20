@@ -157,9 +157,10 @@ void got_packet(u_char *args, const struct pcap_pkthdr *pcap_header, const u_cha
 			*/
 			case ETHERTYPE_VLAN:
 				// Using loop to account for double tagging (can you triple?!)
-				for(size_vlan_offset=4;  ethernet->ether_type == ETHERTYPE_VLAN ; size_vlan_offset+=4) {
+				for(size_vlan_offset=4; ntohs(ethernet->ether_type) == ETHERTYPE_VLAN ; size_vlan_offset+=4) {
 					ethernet = (struct ether_header*)(packet+size_vlan_offset);
 				}
+				size_vlan_offset -= 4;
 				break;
 			/* PPPoE */
 			case 0x8864:
